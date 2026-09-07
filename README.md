@@ -13,16 +13,24 @@ days-out-of-stock trend chart.
 
 ## 1. Setup
 
+Commands below are for **Git Bash on Windows**. Create the virtual environment
+(named `virtual`, not the usual `venv`) and activate it:
+
 ```bash
-python3 -m venv venv && source venv/bin/activate
+python -m venv virtual
+source virtual/Scripts/activate
 pip install -r requirements.txt
 ```
+
+You'll know it worked when your prompt shows `(virtual)` at the start of the
+line. From then on, run `source virtual/Scripts/activate` again any time you
+open a new Git Bash window to work on this project; `deactivate` turns it off.
 
 Create a Postgres database and role (adjust names/password as you like):
 
 ```sql
-CREATE USER cgd WITH PASSWORD 'cgd_dev_pw' CREATEDB;
-CREATE DATABASE commodity_tracker OWNER cgd;
+CREATE USER example WITH PASSWORD 'example pwd' CREATEDB;
+CREATE DATABASE commodity_tracker OWNER example;
 ```
 
 Copy `.env.example` to `.env` (or just export the same variables) and adjust if your
@@ -35,10 +43,10 @@ cp .env.example .env
 Then:
 
 ```bash
-python3 manage.py migrate
-python3 manage.py seed_forms        # registers MOH 748 / 721 / S11 in the form switcher
-python3 manage.py createsuperuser   # this is you — a superuser sees & can upload everything
-python3 manage.py runserver
+python manage.py migrate
+python manage.py seed_forms        # registers MOH 748 / 721 / S11 in the form switcher
+python manage.py createsuperuser   # this is you — a superuser sees & can upload everything
+python manage.py runserver
 ```
 
 Log in at `/login/`, then **Upload** your MOH 748 monthly export.
@@ -52,7 +60,7 @@ instead of empty:
 
 ```bash
 psql -h 127.0.0.1 -U cgd -d commodity_tracker -f sample_data_dump.sql
-python3 manage.py createsuperuser
+python manage.py createsuperuser
 ```
 
 ## 2. Creating SCHMT / CHMT / facility in-charge / MEL lead accounts
