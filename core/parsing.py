@@ -21,7 +21,6 @@ from .models import (
     IndicatorSummary,
     MOH748Record,
     MOH748Upload,
-    Status,
     SubCounty,
     Threshold,
     Ward,
