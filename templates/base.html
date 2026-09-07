@@ -1,0 +1,51 @@
+{% load static %}<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{% block title %}Commodity Tracker{% endblock %}</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@500;600&display=swap">
+<link rel="stylesheet" href="{% static 'css/dashboard.css' %}">
+</head>
+<body>
+{% if user.is_authenticated %}
+<div class="app-header">
+  <div class="brand">
+    <div class="brand-mark">CT</div>
+    <div>
+      <div class="brand-name">Commodity Tracker</div>
+      <div class="brand-sub">Living Goods Kenya &middot; Digital Health</div>
+    </div>
+  </div>
+  <div style="display:flex; align-items:center; gap:16px;">
+    <div class="form-switch">
+      <span class="active">MOH 748 &middot; Commodity Logistics</span>
+      <span class="disabled">MOH 721 &middot; soon</span>
+      <span class="disabled">MOH S11 &middot; soon</span>
+    </div>
+    <div class="user-badge">
+      <div class="avatar">{{ user.get_full_name|default:user.username|slice:":2"|upper }}</div>
+      <div>
+        <div style="font-weight:600;">{{ user.get_full_name|default:user.username }}</div>
+        <div style="opacity:.72;">{{ user.get_role_display|default:"Superuser" }}</div>
+      </div>
+    </div>
+    {% if user.may_upload %}<a href="{% url 'upload' %}" style="color:#fff;">Upload</a>{% endif %}
+    {% if user.is_staff %}<a href="{% url 'admin:index' %}" style="color:#fff;">Admin</a>{% endif %}
+    <form action="{% url 'logout' %}" method="post" style="margin:0;">{% csrf_token %}
+      <button type="submit" style="background:none; border:none; color:#fff; cursor:pointer; font-size:12.5px; font-family:inherit;">Log out</button>
+    </form>
+  </div>
+</div>
+{% endif %}
+
+{% if messages %}
+<ul class="messages">
+  {% for message in messages %}<li class="{{ message.tags }}">{{ message }}</li>{% endfor %}
+</ul>
+{% endif %}
+
+{% block content %}{% endblock %}
+
+</body>
+</html>

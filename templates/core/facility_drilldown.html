@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+{% block title %}{{ facility.name }} — Commodity Tracker{% endblock %}
+{% block content %}
+<div class="dash-body">
+  <p><a href="{% url 'home' %}">&larr; Back to dashboard</a></p>
+
+  <div class="card">
+    <div class="drilldown-header" style="display:flex; justify-content:space-between; align-items:flex-start;">
+      <div>
+        <div class="breadcrumb">{{ facility.county.name }} &rsaquo; {{ facility.sub_county.name }} &rsaquo; {{ facility.ward.name }}</div>
+        <div class="facility-name">{{ facility.name }}</div>
+        <div style="margin-top:8px; display:flex; align-items:center; gap:10px;">
+          {% if stockout_count %}<span class="status-badge">{{ stockout_count }} commodit{{ stockout_count|pluralize:"y,ies" }} out of stock</span>{% endif %}
+          <span style="font-size:11.5px; font-weight:600; color:var(--ink-soft);">MOH 748 &middot; {{ period_display }}</span>
+        </div>
+      </div>
+      <form method="get" style="margin:0;">
+        <select name="period" onchange="this.form.submit()" style="border:1px solid var(--line); border-radius:8px; padding:8px 10px;">
+          {% for p in periods %}<option value="{{ p }}" {% if p == period %}selected{% endif %}>{{ p }}</option>{% endfor %}
+        </select>
+      </form>
+    </div>
+
+    <div style="overflow-x:auto;">
+      <table class="heatmap">
+        <thead>
+          <tr>
+            <th>Commodity</th>
+            <th style="text-align:right;">Begin. Balance</th>
+            <th style="text-align:right;">Received</th>
+            <th style="text-align:right;">Dispensed</th>
+            <th style="text-align:right;">Physical Count</th>
+            <th style="text-align:right;">Near-Expiry</th>
+            <th style="text-align:center;">
+              Days Out
+              {% if threshold %}
+              <span class="def-tip">&#9432;<span class="bubble">{{ threshold.definition }}</span></span>
+              {% endif %}
+            </th>
+            <th style="text-align:center;">Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in rows %}
+          <tr>
+            <td style="font-weight:600;">{{ row.record.get_commodity_display }}</td>
+            <td style="text-align:right;" class="mono">{{ row.record.beginning_balance|default:"–" }}</td>
+            <td style="text-align:right;" class="mono">{{ row.record.quantity_received|default:"–" }}</td>
+            <td style="text-align:right;" class="mono">{{ row.record.total_dispensed|default:"–" }}</td>
+            <td style="text-align:right;" class="mono">{{ row.record.physical_count|default:"–" }}</td>
+            <td style="text-align:right;" class="mono">{{ row.record.near_expiry_6mo|default:"–" }}</td>
+            <td style="text-align:center;" class="mono">{{ row.record.days_out_of_stock|default:"–" }}</td>
+            <td style="text-align:center;">{% if row.status %}<span class="pill {{ row.status }}">&nbsp;</span>{% endif %}</td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="8" style="color:var(--ink-soft); padding:20px 8px;">No MOH 748 data for this facility in {{ period_display }}.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}

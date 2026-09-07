@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block title %}Sign in — Commodity Tracker{% endblock %}
+{% block content %}
+<div class="auth-wrap">
+  <div class="auth-card">
+    <h1>Commodity Tracker</h1>
+    <form method="post">
+      {% csrf_token %}
+      <label for="id_username">Username</label>
+      <input type="text" name="username" id="id_username" required autofocus>
+      <label for="id_password">Password</label>
+      <input type="password" name="password" id="id_password" required>
+      {% if form.errors %}<p style="color:#D14343; font-size:12.5px;">Incorrect username or password.</p>{% endif %}
+      <button type="submit" class="btn btn-primary" style="width:100%;">Sign in</button>
+    </form>
+  </div>
+</div>
+{% endblock %}

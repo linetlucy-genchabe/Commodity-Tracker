@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block title %}Upload MOH 748 — Commodity Tracker{% endblock %}
+{% block content %}
+<div class="dash-body" style="max-width:520px;">
+  <div class="card">
+    <div class="card-title">Upload MOH 748</div>
+    <div class="card-sub">One reporting month per file. Uploading a period that already exists replaces its records — nothing is silently merged, and every other period is left untouched.</div>
+    <form method="post" enctype="multipart/form-data" style="margin-top:18px;">
+      {% csrf_token %}
+      {{ form.file }}
+      <div style="margin-top:16px;">
+        <button type="submit" class="btn btn-primary">Upload</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}
