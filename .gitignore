@@ -6,3 +6,42 @@ venv/
 staticfiles/
 *.sqlite3
 .DS_Store
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+*.egg
+*.egg-info/
+dist/
+build/
+
+# Virtual environment
+venv/
+virtual/
+env/
+.venv/
+
+# Django
+*.log
+local_settings.py
+staticfiles/
+media/
+
+# Environment variables — NEVER commit this
+.env
+
+# Database
+*.sqlite3
+*.db
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
