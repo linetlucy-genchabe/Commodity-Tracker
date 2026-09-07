@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load static %}
 {% block title %}Dashboard — Commodity Tracker{% endblock %}
 {% block content %}
 
@@ -82,6 +83,69 @@
     </div>
   </div>
 
+  {% if level == "county" or level == "sub_county" %}
+  <div class="card">
+    <div style="display:flex; justify-content:space-between; align-items:flex-end; margin-bottom:14px; flex-wrap:wrap; gap:10px;">
+      <div>
+        <div class="card-title">{% if level == "county" %}County Summary{% else %}Sub-County Summary{% endif %}</div>
+        <div class="card-sub">MOH 748 &middot; {{ period_display }} &middot; click a row to drill down</div>
+      </div>
+      <div class="legend">
+        <span><span class="dot" style="background:var(--green);"></span>Adequate (0 days)</span>
+        <span><span class="dot" style="background:var(--amber);"></span>Low (1&ndash;6 days)</span>
+        <span><span class="dot" style="background:var(--red);"></span>Stockout (&ge;7 days)</span>
+      </div>
+    </div>
+
+    <div style="overflow-x:auto;">
+      <table class="heatmap">
+        <thead>
+          <tr>
+            <th>{% if level == "county" %}County{% else %}Sub-County{% endif %}</th>
+            <th style="text-align:center;">Facilities Reporting</th>
+            <th style="text-align:center;">With Stockout</th>
+            <th style="text-align:center;">Avg. Days Out of Stock</th>
+            <th style="text-align:center;">Near-Expiry Items</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in geo_summary %}
+          <tr {% if level == "county" %}style="background:#F7F9FB;"{% endif %}>
+            <td {% if level == "county" %}style="font-weight:700;"{% endif %}>
+              {% if level == "county" %}
+                <a href="?period={{ period }}&county={{ row.unit.id }}">{{ row.unit.name }}</a>
+              {% else %}
+                <a href="?period={{ period }}&county={{ selected.county }}&sub_county={{ row.unit.id }}">{{ row.unit.name }}</a>
+              {% endif %}
+            </td>
+            <td style="text-align:center;">{{ row.kpis.reporting }} / {{ row.kpis.total_in_scope }}</td>
+            <td style="text-align:center;">
+              {% if row.kpis.with_stockout > 0 %}<span class="pill RED">{{ row.kpis.with_stockout }}</span>{% else %}<span class="pill GREEN">0</span>{% endif %}
+            </td>
+            <td style="text-align:center;" class="mono">{{ row.kpis.avg_days }}</td>
+            <td style="text-align:center;" class="mono">{{ row.kpis.near_expiry }}</td>
+          </tr>
+          {% for sub_row in row.sub_rows %}
+          <tr>
+            <td style="padding-left:32px; color:var(--ink-soft);">
+              <a href="?period={{ period }}&county={{ row.unit.id }}&sub_county={{ sub_row.unit.id }}">{{ sub_row.unit.name }}</a>
+            </td>
+            <td style="text-align:center;">{{ sub_row.kpis.reporting }} / {{ sub_row.kpis.total_in_scope }}</td>
+            <td style="text-align:center;">
+              {% if sub_row.kpis.with_stockout > 0 %}<span class="pill RED">{{ sub_row.kpis.with_stockout }}</span>{% else %}<span class="pill GREEN">0</span>{% endif %}
+            </td>
+            <td style="text-align:center;" class="mono">{{ sub_row.kpis.avg_days }}</td>
+            <td style="text-align:center;" class="mono">{{ sub_row.kpis.near_expiry }}</td>
+          </tr>
+          {% endfor %}
+          {% empty %}
+          <tr><td colspan="5" style="color:var(--ink-soft); padding:20px 8px;">No data for this selection.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {% else %}
   <div class="card">
     <div style="display:flex; justify-content:space-between; align-items:flex-end; margin-bottom:14px; flex-wrap:wrap; gap:10px;">
       <div>
@@ -129,6 +193,7 @@
       {% if heatmap.page.has_next %}<a href="?{{ request.GET.urlencode }}&page={{ heatmap.page.next_page_number }}">Next &rarr;</a>{% endif %}
     </div>
   </div>
+  {% endif %}
 
   <div class="bottom-row">
     <div class="card">
@@ -161,7 +226,7 @@
 </div>
 
 {% if trend_json %}
-<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.4/chart.umd.min.js"></script>
+<script src="{% static 'js/chart.umd.js' %}"></script>
 <script>
   const trend = {{ trend_json|safe }};
   const ctx = document.getElementById('trendChart');

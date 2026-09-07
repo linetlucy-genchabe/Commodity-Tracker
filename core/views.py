@@ -181,6 +181,35 @@ def build_heatmap(records_qs, *, page_number=1):
     }
 
 
+def build_geo_summary(records_qs, facilities_qs, *, group_by, nested=False):
+    """
+    Aggregate KPIs one level down the geography hierarchy — one row per
+    county or per sub-county. Used for the county/sub-county summary screens
+    that sit above the facility-level heatmap.
+
+    nested=True (only meaningful when group_by="county") also attaches each
+    county's own sub-county breakdown as row["sub_rows"], so the sub-counties
+    are visible immediately rather than behind an extra click.
+    """
+    if group_by == "county":
+        model, fk, id_field = County, "ward__sub_county__county", "ward__sub_county__county_id"
+    else:
+        model, fk, id_field = SubCounty, "ward__sub_county", "ward__sub_county_id"
+
+    unit_ids = facilities_qs.values_list(id_field, flat=True).distinct()
+    units = model.objects.filter(id__in=unit_ids).order_by("name")
+
+    rows = []
+    for unit in units:
+        unit_facilities = facilities_qs.filter(**{fk: unit})
+        unit_records = records_qs.filter(facility__in=unit_facilities)
+        row = {"unit": unit, "kpis": build_kpis(unit_records, unit_facilities)}
+        if nested and group_by == "county":
+            row["sub_rows"] = build_geo_summary(unit_records, unit_facilities, group_by="sub_county")
+        rows.append(row)
+    return rows
+
+
 def top_stockout_facilities(records_qs, limit=5):
     return list(
         records_qs.filter(days_out_of_stock__gt=0)
@@ -242,6 +271,16 @@ def home(request):
         "facility__ward__sub_county__county"
     )
 
+    # Drill-down: land on a county summary, then a sub-county summary, and
+    # only reach the facility-level heatmap once a sub-county (or narrower)
+    # is chosen — either by clicking a summary row or using the filter bar.
+    if sub_county_id or ward_id or facility_id:
+        level = "facility"
+    elif county_id:
+        level = "sub_county"
+    else:
+        level = "county"
+
     try:
         page_number = int(request.GET.get("page", 1))
     except ValueError:
@@ -262,13 +301,21 @@ def home(request):
             "ward": ward_id or "",
             "facility": facility_id or "",
         },
+        "level": level,
         "kpis": build_kpis(records, filtered_facilities),
-        "heatmap": build_heatmap(records, page_number=page_number),
         "top_facilities": top_stockout_facilities(records),
         "trend_json": json.dumps(trend_series(trend_qs), cls=DjangoJSONEncoder),
         "trend_months": TREND_MONTHS,
         "can_upload": user.may_upload,
     }
+
+    if level == "facility":
+        context["heatmap"] = build_heatmap(records, page_number=page_number)
+    else:
+        context["geo_summary"] = build_geo_summary(
+            records, filtered_facilities, group_by=level, nested=(level == "county")
+        )
+
     return render(request, "core/home.html", context)
 
 
