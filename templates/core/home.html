@@ -3,55 +3,71 @@
 {% block title %}Dashboard — Commodity Tracker{% endblock %}
 {% block content %}
 
-<form class="filter-bar" method="get">
-  <div class="filter-group">
-    <label for="period">Period</label>
-    <select name="period" id="period" onchange="this.form.submit()">
-      {% for p in periods %}
-        <option value="{{ p }}" {% if p == period %}selected{% endif %}>{{ p }}</option>
-      {% endfor %}
-    </select>
-  </div>
-  <div class="filter-group">
-    <label for="county">County</label>
-    <select name="county" id="county" onchange="this.form.submit()">
-      <option value="">All counties</option>
-      {% for c in filters.counties %}
-        <option value="{{ c.id }}" {% if selected.county == c.id|stringformat:"s" %}selected{% endif %}>{{ c.name }}</option>
-      {% endfor %}
-    </select>
-  </div>
-  <div class="filter-group">
-    <label for="sub_county">Sub-County</label>
-    <select name="sub_county" id="sub_county" onchange="this.form.submit()">
-      <option value="">All sub-counties</option>
-      {% for s in filters.sub_counties %}
-        <option value="{{ s.id }}" {% if selected.sub_county == s.id|stringformat:"s" %}selected{% endif %}>{{ s.name }}</option>
-      {% endfor %}
-    </select>
-  </div>
-  <div class="filter-group">
-    <label for="ward">Ward</label>
-    <select name="ward" id="ward" onchange="this.form.submit()">
-      <option value="">All wards</option>
-      {% for w in filters.wards %}
-        <option value="{{ w.id }}" {% if selected.ward == w.id|stringformat:"s" %}selected{% endif %}>{{ w.name }}</option>
-      {% endfor %}
-    </select>
-  </div>
-  <div class="filter-group" style="flex-grow:1;">
-    <label for="facility">Facility</label>
-    <select name="facility" id="facility" onchange="this.form.submit()" style="width:100%;">
-      <option value="">All facilities</option>
-      {% for f in filters.facilities %}
-        <option value="{{ f.id }}" {% if selected.facility == f.id|stringformat:"s" %}selected{% endif %}>{{ f.name }}</option>
-      {% endfor %}
-    </select>
-  </div>
-  <a href="{% url 'home' %}" class="btn btn-outline">Reset</a>
-</form>
+<div class="dash-layout">
 
-<div class="dash-body">
+  <form class="filter-sidebar" id="filterForm" method="get">
+    <div class="sidebar-heading">Filters</div>
+
+    <div class="filter-group">
+      <label for="period">Period</label>
+      <select name="period" id="period" onchange="this.form.submit()">
+        {% for p in periods %}
+          <option value="{{ p }}" {% if p == period %}selected{% endif %}>{{ p }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="filter-group">
+      <label for="county">County</label>
+      <select name="county" id="county" onchange="this.form.submit()">
+        <option value="">All counties</option>
+        {% for c in filters.counties %}
+          <option value="{{ c.id }}" {% if selected.county == c.id|stringformat:"s" %}selected{% endif %}>{{ c.name }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="filter-group">
+      <label for="sub_county">Sub-County</label>
+      <select name="sub_county" id="sub_county" onchange="this.form.submit()">
+        <option value="">All sub-counties</option>
+        {% for s in filters.sub_counties %}
+          <option value="{{ s.id }}" {% if selected.sub_county == s.id|stringformat:"s" %}selected{% endif %}>{{ s.name }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="filter-group">
+      <label for="ward">Ward</label>
+      <select name="ward" id="ward" onchange="this.form.submit()">
+        <option value="">All wards</option>
+        {% for w in filters.wards %}
+          <option value="{{ w.id }}" {% if selected.ward == w.id|stringformat:"s" %}selected{% endif %}>{{ w.name }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="filter-group">
+      <label for="facility">Facility</label>
+      <select name="facility" id="facility" onchange="this.form.submit()">
+        <option value="">All facilities</option>
+        {% for f in filters.facilities %}
+          <option value="{{ f.id }}" {% if selected.facility == f.id|stringformat:"s" %}selected{% endif %}>{{ f.name }}</option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <div class="sidebar-actions">
+      <a href="{% url 'home' %}" class="btn btn-outline" style="width:100%; text-align:center; display:block;">Reset filters</a>
+    </div>
+
+    <div class="sidebar-legend">
+      <div class="sidebar-heading">Legend</div>
+      <div class="legend-vertical">
+        <span><span class="dot" style="background:var(--green);"></span>Adequate (0 days)</span>
+        <span><span class="dot" style="background:var(--amber);"></span>Low (1&ndash;6 days)</span>
+        <span><span class="dot" style="background:var(--red);"></span>Stockout (&ge;7 days)</span>
+      </div>
+    </div>
+  </form>
+
+<div class="dash-main">
 
 {% if no_data %}
   <div class="card empty-note">
@@ -89,11 +105,6 @@
       <div>
         <div class="card-title">{% if level == "county" %}County Summary{% else %}Sub-County Summary{% endif %}</div>
         <div class="card-sub">MOH 748 &middot; {{ period_display }} &middot; click a row to drill down</div>
-      </div>
-      <div class="legend">
-        <span><span class="dot" style="background:var(--green);"></span>Adequate (0 days)</span>
-        <span><span class="dot" style="background:var(--amber);"></span>Low (1&ndash;6 days)</span>
-        <span><span class="dot" style="background:var(--red);"></span>Stockout (&ge;7 days)</span>
       </div>
     </div>
 
@@ -155,11 +166,7 @@
         </div>
         <div class="card-sub">MOH 748 &middot; {{ period_display }} &middot; showing {{ heatmap.page.start_index }}&ndash;{{ heatmap.page.end_index }} of {{ heatmap.page.paginator.count }} facilities</div>
       </div>
-      <div class="legend">
-        <span><span class="dot" style="background:var(--green);"></span>Adequate (0 days)</span>
-        <span><span class="dot" style="background:var(--amber);"></span>Low (1&ndash;6 days)</span>
-        <span><span class="dot" style="background:var(--red);"></span>Stockout (&ge;7 days)</span>
-      </div>
+      <input type="search" name="q" form="filterForm" value="{{ selected.q }}" placeholder="Search facility name&hellip;" class="facility-search" onkeydown="if(event.key==='Enter'){event.preventDefault(); this.form.submit();}">
     </div>
 
     <div style="overflow-x:auto;">
@@ -223,6 +230,8 @@
   </div>
 
 {% endif %}
+</div>
+
 </div>
 
 {% if trend_json %}

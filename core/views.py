@@ -260,12 +260,15 @@ def home(request):
     sub_county_id = request.GET.get("sub_county") or None
     ward_id = request.GET.get("ward") or None
     facility_id = request.GET.get("facility") or None
+    search_query = (request.GET.get("q") or "").strip()
 
     filtered_facilities = apply_geo_filters(
         facilities, county_id=county_id, sub_county_id=sub_county_id, ward_id=ward_id
     )
     if facility_id:
         filtered_facilities = filtered_facilities.filter(id=facility_id)
+    if search_query:
+        filtered_facilities = filtered_facilities.filter(name__icontains=search_query)
 
     records = MOH748Record.objects.filter(period=period, facility__in=filtered_facilities).select_related(
         "facility__ward__sub_county__county"
@@ -300,6 +303,7 @@ def home(request):
             "sub_county": sub_county_id or "",
             "ward": ward_id or "",
             "facility": facility_id or "",
+            "q": search_query,
         },
         "level": level,
         "kpis": build_kpis(records, filtered_facilities),
