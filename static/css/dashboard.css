@@ -1,15 +1,22 @@
 :root{
-  --navy:#0B3B66;
-  --sky:#2F9BD6;
+  --navy:#002D63;
+  --navy2:#0A4F99;
+  --sky:#157FFB;
   --orange:#F0793F;
-  --purple:#6C4F9E;
-  --green:#3F9A56;   --green-bg:#E7F5EA;
-  --amber:#E0A526;   --amber-bg:#FCF3DD;
-  --red:#D14343;     --red-bg:#FBE7E7;
+  --purple:#6C4F9E;  --purple-bg:#F1ECF8;
+  --green:#3F9A56;   --green-bg:#EAF6ED;
+  --amber:#D9A544;   --amber-bg:#FBF3DE;
+  --red:#E5574B;     --red-bg:#FDEDEB;
+  --teal:#1F9E93;    --teal-bg:#E6F6F4;
+  --pink:#D64C8C;    --pink-bg:#FBEAF2;
+  --sky-bg:#E5F1FE;
+  --indigo:#5468C4;  --indigo-bg:#ECEEFA;
   --ink:#182635;
   --ink-soft:#5B6472;
+  --ink-faint:#9AA3AF;
   --line:#E4E8EE;
   --bg:#F5F7FA;
+  --bg-sidebar:#F8FAFC;
   --card:#FFFFFF;
 }
 *{box-sizing:border-box;}
@@ -25,29 +32,70 @@ a:hover{color:var(--navy); text-decoration:underline;}
 
 /* header */
 .app-header{
-  height:64px; background:var(--navy); color:#fff;
+  height:64px; background:linear-gradient(90deg, var(--navy) 0%, var(--navy2) 100%); color:#fff;
   display:flex; align-items:center; justify-content:space-between;
-  padding:0 28px;
+  padding:0 28px; box-shadow:0 2px 10px rgba(0,45,99,.18);
 }
-.app-header .brand{display:flex; align-items:center; gap:10px;}
+.app-header .brand{display:flex; align-items:center; gap:11px;}
 .app-header .brand-mark{
-  width:26px; height:26px; border-radius:6px;
-  background:rgba(255,255,255,.14); border:1px solid rgba(255,255,255,.4);
-  display:flex; align-items:center; justify-content:center; font-weight:700; font-size:12px;
+  width:32px; height:32px; border-radius:10px;
+  background:linear-gradient(135deg, var(--sky) 0%, var(--teal) 100%);
+  border:1px solid rgba(255,255,255,.35);
+  box-shadow:0 2px 6px rgba(0,0,0,.18), inset 0 1px 0 rgba(255,255,255,.25);
+  display:flex; align-items:center; justify-content:center; font-weight:800; font-size:13px; letter-spacing:.2px;
+  color:#fff;
 }
-.app-header .brand-name{font-weight:700; font-size:15px;}
-.app-header .brand-sub{font-size:11px; opacity:.72;}
-.form-switch{display:flex; align-items:center; gap:6px; background:#fff; border-radius:8px; padding:5px;}
-.form-switch a, .form-switch span{
-  font-size:12px; font-weight:600; padding:6px 12px; border-radius:6px; display:inline-block;
+.app-header .brand-name{font-weight:800; font-size:15.5px; letter-spacing:-.1px;}
+.app-header .brand-sub{font-size:11px; opacity:.75; font-weight:500; letter-spacing:.1px;}
+.form-switch{display:flex; align-items:center; gap:4px; background:rgba(255,255,255,.1); border-radius:11px; padding:4px;}
+.form-switch a{
+  font-size:12.5px; font-weight:700; padding:7px 14px; border-radius:8px; display:inline-flex; align-items:center; gap:7px;
+  color:rgba(255,255,255,.78); letter-spacing:.1px;
 }
-.form-switch .active{background:var(--navy); color:#fff;}
-.form-switch .disabled{color:#A9B2BE; background:#F2F4F7;}
-.user-badge{display:flex; align-items:center; gap:8px; font-size:12.5px;}
-.user-badge .avatar{
-  width:28px; height:28px; border-radius:50%; background:rgba(255,255,255,.18);
-  display:flex; align-items:center; justify-content:center; font-weight:700; font-size:11px;
+.form-switch a:hover{color:#fff; text-decoration:none; background:rgba(255,255,255,.08);}
+.form-switch a.active{background:var(--tab-accent, var(--navy2)); color:#fff; box-shadow:0 2px 8px rgba(0,0,0,.16);}
+.form-switch .tab-dot{width:6px; height:6px; border-radius:50%; display:inline-block; box-shadow:0 0 0 2px rgba(255,255,255,.35);}
+.form-switch a.active .tab-dot{background:#fff !important; box-shadow:none;}
+.avatar{
+  width:28px; height:28px; border-radius:50%;
+  background:linear-gradient(135deg, var(--orange) 0%, var(--pink) 100%);
+  display:flex; align-items:center; justify-content:center; font-weight:700; font-size:11px; color:#fff;
+  flex-shrink:0;
 }
+
+/* User menu — a single <details>/<summary> dropdown that replaces three
+   separate always-visible pill buttons (Upload/Admin/Log out) with one
+   click target, closed by default. base.html adds a small script to close
+   it on an outside click or Escape (details/summary alone don't do that). */
+.user-menu{position:relative; font-size:12.5px;}
+.user-menu-trigger{
+  display:flex; align-items:center; gap:9px; list-style:none; cursor:pointer;
+  padding:5px 9px 5px 5px; border-radius:11px; color:#fff; user-select:none;
+}
+.user-menu-trigger::-webkit-details-marker{display:none;}
+.user-menu-trigger::marker{content:"";}
+.user-menu-trigger:hover{background:rgba(255,255,255,.1);}
+.user-menu[open] .user-menu-trigger{background:rgba(255,255,255,.14);}
+.user-menu-info{line-height:1.3;}
+.user-menu-name{font-weight:600;}
+.user-menu-role{opacity:.72; font-size:11.5px;}
+.user-menu-chevron{opacity:.75; transition:transform .15s; flex-shrink:0;}
+.user-menu[open] .user-menu-chevron{transform:rotate(180deg);}
+.user-menu-dropdown{
+  position:absolute; top:calc(100% + 8px); right:0; min-width:186px;
+  background:#fff; border-radius:12px; padding:6px;
+  box-shadow:0 14px 32px -10px rgba(15,32,55,.4), 0 2px 10px rgba(15,32,55,.14);
+  display:flex; flex-direction:column; gap:2px; z-index:60;
+}
+.user-menu-item{
+  display:flex; align-items:center; gap:10px; padding:9px 11px; border-radius:8px;
+  font-size:13px; font-weight:600; color:var(--ink); text-decoration:none;
+  background:none; border:none; width:100%; text-align:left; cursor:pointer; font-family:inherit;
+}
+.user-menu-item svg{opacity:.65; flex-shrink:0;}
+.user-menu-item:hover{background:var(--sky-bg); color:var(--navy); text-decoration:none;}
+.user-menu-item-danger:hover{background:var(--red-bg); color:var(--red);}
+.user-menu-item-danger:hover svg{opacity:1;}
 
 /* filter bar (legacy horizontal bar — no longer used by home.html, kept
    in case a future page wants the same look) */
@@ -70,17 +118,48 @@ a:hover{color:var(--navy); text-decoration:underline;}
 /* dashboard: left filter sidebar + main content, side by side */
 .dash-layout{display:flex; align-items:flex-start;}
 .filter-sidebar{
-  width:228px; flex:0 0 228px; background:var(--card); border-right:1px solid var(--line);
+  width:228px; flex:0 0 228px;
+  /* Extends the header's navy gradient down the page instead of the
+     sidebar sitting on its own pale panel — the pop-of-color direction
+     Lynne picked from the color-directions mockup. */
+  background:linear-gradient(180deg, var(--navy) 0%, var(--navy2) 100%);
   padding:20px 16px; display:flex; flex-direction:column; gap:16px;
-  position:sticky; top:0; align-self:flex-start; max-height:100vh; overflow-y:auto;
+  position:sticky; top:0; align-self:flex-start;
+  min-height:calc(100vh - 64px); max-height:100vh; overflow-y:auto;
+}
+.filter-sidebar select.filter-active{
+  border:1.5px solid #fff; box-shadow:0 0 0 3px rgba(255,255,255,.22);
 }
 .filter-sidebar .filter-group select,
 .filter-sidebar .filter-group input{width:100%; min-width:0;}
+.filter-sidebar .filter-group label{color:rgba(255,255,255,.55);}
+.filter-sidebar .filter-group select,
+.filter-sidebar .facility-search{
+  border:1px solid rgba(255,255,255,.22); background:rgba(255,255,255,.08); color:#fff;
+}
+/* The <select> itself is white-on-translucent-navy (readable, by design),
+   but its dropdown popup is rendered by the browser as an opaque list that
+   ignores the select's own background — so the white text above was
+   showing up on a white popup with no override. Force the popup's own
+   text/background explicitly so the open list stays readable; this does
+   not affect how the closed select looks. */
+.filter-sidebar .filter-group select option{
+  color:var(--ink); background:#fff;
+}
+.filter-sidebar .sidebar-heading{color:rgba(255,255,255,.62);}
+.filter-sidebar .sidebar-actions{border-top:1px solid rgba(255,255,255,.16); padding-top:14px; margin-top:2px;}
+.filter-sidebar .sidebar-legend{margin-top:auto; padding-top:16px; border-top:1px solid rgba(255,255,255,.16);}
+.filter-sidebar .btn-outline{background:transparent; color:#fff; border:1.5px solid rgba(255,255,255,.5);}
+.filter-sidebar .btn-outline:hover{background:rgba(255,255,255,.08);}
 .sidebar-heading{font-size:10.5px; font-weight:700; color:var(--ink-soft); text-transform:uppercase; letter-spacing:.5px;}
 .sidebar-actions{border-top:1px solid var(--line); padding-top:14px; margin-top:2px;}
 .sidebar-legend{margin-top:auto; padding-top:16px; border-top:1px solid var(--line);}
-.legend-vertical{display:flex; flex-direction:column; gap:6px; font-size:12px; color:var(--ink-soft); margin-top:8px;}
-.legend-vertical .dot{width:10px; height:10px; border-radius:3px; display:inline-block; margin-right:6px;}
+.legend-vertical{display:flex; flex-direction:column; gap:7px; margin-top:8px;}
+.legend-chip{display:inline-flex; align-items:center; gap:7px; font-size:11.5px; font-weight:600; padding:5px 10px; border-radius:20px; width:fit-content;}
+.legend-chip .dot{width:7px; height:7px; border-radius:50%; display:inline-block;}
+.legend-chip.green{background:var(--green-bg); color:#1F5C2E;}
+.legend-chip.amber{background:var(--amber-bg); color:#7A5A0E;}
+.legend-chip.red{background:var(--red-bg); color:#8C2E26;}
 
 .facility-search{
   border:1px solid var(--line); border-radius:8px; padding:8px 12px; font-size:13px;
@@ -88,47 +167,210 @@ a:hover{color:var(--navy); text-decoration:underline;}
 }
 
 /* main content area (tightened up to cut down on blank space) */
-.dash-main{flex:1; min-width:0; padding:18px 24px 24px; display:flex; flex-direction:column; gap:12px;}
+.dash-main{flex:1; min-width:0; padding:18px 24px 28px; display:flex; flex-direction:column; gap:12px;}
 
 .kpi-row{display:grid; grid-template-columns:repeat(4,1fr); gap:12px;}
 @media (max-width: 1000px){ .kpi-row{grid-template-columns:repeat(2,1fr);} }
 .kpi-card{
-  background:var(--card); border-radius:12px; padding:13px 16px;
-  box-shadow:0 1px 2px rgba(15,32,55,.06); border-left:4px solid var(--navy);
+  /* Full tinted background per card, matching its icon/value color,
+     instead of four identical white boxes — the other half of the
+     color-directions mockup Lynne picked. The "reporting" card (no
+     modifier class) is sky-tinted rather than grey, so nothing in the
+     KPI row reads as a flat, colorless box. */
+  background:var(--sky-bg); border-radius:14px; padding:14px 16px;
+  box-shadow:0 1px 2px rgba(15,32,55,.05), 0 8px 20px -12px rgba(21,127,251,.22);
 }
-.kpi-card.stockout{border-color:var(--red);}
-.kpi-card.days{border-color:var(--amber);}
-.kpi-card.expiry{border-color:var(--purple);}
+.kpi-card.stockout{background:var(--red-bg); box-shadow:0 1px 2px rgba(15,32,55,.05), 0 8px 20px -12px rgba(229,87,75,.28);}
+.kpi-card.days{background:var(--amber-bg); box-shadow:0 1px 2px rgba(15,32,55,.05), 0 8px 20px -12px rgba(217,165,68,.28);}
+.kpi-card.expiry{background:var(--purple-bg); box-shadow:0 1px 2px rgba(15,32,55,.05), 0 8px 20px -12px rgba(108,79,158,.24);}
+.kpi-card.expiry-ok{background:var(--green-bg); box-shadow:0 1px 2px rgba(15,32,55,.05), 0 8px 20px -12px rgba(63,154,86,.24);}
+.kpi-card.weeks{background:var(--teal-bg); box-shadow:0 1px 2px rgba(15,32,55,.05), 0 8px 20px -12px rgba(31,158,147,.24);}
+.kpi-head{display:flex; align-items:center; justify-content:space-between; gap:9px; margin-bottom:10px;}
+.kpi-head-left{display:flex; align-items:center; gap:9px; min-width:0;}
+.kpi-delta{font-size:11.5px; font-weight:700; text-align:right; white-space:nowrap;}
+.kpi-delta.good{color:#1F5C2E;}
+.kpi-delta.bad{color:#8C2E26;}
+.kpi-delta.flat{color:var(--ink-faint);}
+.kpi-delta-compare{font-size:10px; color:var(--ink-faint); text-align:right; margin-top:1px;}
+.kpi-icon{width:30px; height:30px; border-radius:9px; display:flex; align-items:center; justify-content:center; flex-shrink:0;}
+.kpi-icon.reporting{background:rgba(21,127,251,.18);}
+.kpi-icon.stockout{background:var(--red-bg);}
+.kpi-icon.days{background:var(--amber-bg);}
+.kpi-icon.expiry{background:var(--purple-bg);}
+.kpi-icon.expiry-ok{background:var(--green-bg);}
+.kpi-icon.weeks{background:var(--teal-bg);}
 .kpi-label{font-size:11px; font-weight:700; color:var(--ink-soft); text-transform:uppercase; letter-spacing:.5px;}
-.kpi-value{font-size:28px; font-weight:700; margin-top:8px; font-family:'IBM Plex Mono', monospace;}
+.kpi-value{font-size:32px; font-weight:800; font-family:'IBM Plex Mono', monospace; line-height:1;}
 .kpi-value.stockout{color:var(--red);}
-.kpi-value.days{color:var(--amber);}
+.kpi-value.days{color:#B9860F;}
 .kpi-value.expiry{color:var(--purple);}
+.kpi-value.expiry-ok{color:var(--green);}
+.kpi-value.weeks{color:#0F5F58;}
 .kpi-value.reporting{color:var(--navy);}
-.kpi-sub{font-size:12px; color:var(--ink-soft); margin-top:4px;}
+.kpi-sub{font-size:12px; color:var(--ink-soft); margin-top:7px;}
+.kpi-sub-ok{color:#1F5C2E; font-weight:600;}
 
-.card{background:var(--card); border-radius:12px; padding:16px 18px; box-shadow:0 1px 2px rgba(15,32,55,.06);}
-.card-title{font-size:14.5px; font-weight:700;}
+.card{
+  background:#FFFFFF; border:1px solid rgba(15,32,55,.05); border-radius:16px; padding:18px 20px;
+  /* Lifted well off the page's blue-grey background — a soft near shadow
+     for crispness plus a much bigger, softer far shadow for real
+     elevation, instead of the barely-there shadow this used to have. */
+  box-shadow:0 1px 3px rgba(15,32,55,.06), 0 20px 40px -18px rgba(15,32,55,.28);
+}
+.card-title{
+  font-size:15px; font-weight:800; display:inline-block;
+  border-bottom:2.5px solid var(--navy); padding-bottom:6px;
+}
 .card-sub{font-size:12px; color:var(--ink-soft); margin-top:2px;}
 
 .legend{display:flex; gap:16px; align-items:center; font-size:12px; color:var(--ink-soft);}
 .legend .dot{width:10px; height:10px; border-radius:3px; display:inline-block; margin-right:6px;}
 
 table.heatmap{border-collapse:collapse; width:100%;}
+table.heatmap thead tr{background:var(--sky-bg);}
 table.heatmap th{
-  text-align:left; padding:8px; font-size:11px; color:var(--ink-soft);
-  text-transform:uppercase; letter-spacing:.3px; border-bottom:1px solid var(--line);
+  text-align:left; padding:11px 10px; font-size:10.5px; color:var(--navy);
+  text-transform:uppercase; letter-spacing:.5px; font-weight:800;
+  border-bottom:2.5px solid var(--sky);
 }
-table.heatmap td{padding:6px 8px; border-bottom:1px solid var(--line); font-size:13px;}
+table.heatmap th:first-child{border-top-left-radius:10px;}
+table.heatmap th:last-child{border-top-right-radius:10px;}
+table.heatmap td{padding:9px 10px; border-bottom:1px solid var(--line); font-size:13px;}
 table.heatmap tr:nth-child(even){background:#FAFBFC;}
-.pill{display:inline-block; min-width:24px; padding:3px 8px; border-radius:6px; font-size:11.5px; font-weight:700; text-align:center;}
-.pill.GREEN{background:var(--green); color:#0F3D1C;}
+
+/* Facility heatmap: most cells are "not reported" for any given period.
+   Capping the table's width to avoid stretching empty cells just traded
+   one problem for another — a narrow table with a big blank gutter next
+   to it. table-layout:fixed + explicit column widths (see the <colgroup>
+   in home.html) keeps the table at full card width without stretching
+   any single column, and "not reported" stays a small quiet dot rather
+   than a wide dash. */
+table.heatmap.facility-heatmap{width:100%; min-width:0; table-layout:fixed;}
+table.heatmap.facility-heatmap td{padding:6px 10px;}
+table.heatmap.facility-heatmap td:first-child .row-label,
+table.heatmap.facility-heatmap td:first-child .row-sublabel{
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:100%;
+}
+.cell-na{color:var(--ink-faint); font-size:13px;}
+.pill.REPORT{background:var(--indigo-bg); color:var(--indigo); font-weight:700;}
+.pill.REPORT.empty{background:var(--indigo-bg); color:#8891C7;}
+
+/* "Choose a view" screen — shown after picking a sub-county but before a
+   ward or the full facility list is chosen, so drilling down is an
+   explicit choice instead of a guess. */
+.choose-view-row{display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-top:16px;}
+@media (max-width: 640px){ .choose-view-row{grid-template-columns:1fr;} }
+.choose-view-card{
+  display:block; border:1.5px solid var(--line); border-radius:12px; padding:18px 20px;
+  text-decoration:none; color:inherit; transition:border-color .15s, background .15s, box-shadow .15s;
+  box-shadow:inset 4px 0 0 var(--card-accent, var(--sky));
+}
+.choose-view-card:hover{border-color:var(--card-accent, var(--sky)); background:#F7FBFE; text-decoration:none; box-shadow:inset 4px 0 0 var(--card-accent, var(--sky)), 0 8px 20px -14px rgba(15,32,55,.25);}
+.choose-view-title{font-size:14px; font-weight:700; color:var(--navy); display:flex; align-items:center; gap:10px;}
+.choose-view-title .commodity-chip{width:30px; height:30px;}
+.choose-view-sub{font-size:12.5px; color:var(--ink-soft); margin-top:6px; line-height:1.5;}
+
+/* Unit card grid — replaces a plain table of county/sub-county/CHU/ward
+   rows with a grid of colored cards, one per geography unit, styled after
+   the colorful reference dashboard Lynne shared: a colored circular icon,
+   a colored "reporting" badge, and the real status pills (stockout/low
+   stock/weeks) underneath. The card's own identity color (set inline per
+   row, cycling sky/purple/orange/teal/pink) is decorative only — it
+   deliberately never uses red or green, so it can never be mistaken for
+   the real green=OK/red=danger status pills inside the card. */
+.unit-card-grid{display:grid; grid-template-columns:repeat(auto-fill, minmax(300px, 1fr)); gap:18px; margin-top:16px;}
+.unit-card{
+  display:block; text-decoration:none; color:inherit; border-radius:18px; padding:20px 22px;
+  background:#FFFFFF;
+  border:1.5px solid rgba(15,32,55,.06);
+  border-top:4px solid var(--card-accent, var(--sky));
+  box-shadow:0 1px 3px rgba(15,32,55,.05), 0 16px 32px -18px rgba(15,32,55,.22);
+  transition:transform .12s, box-shadow .12s, border-color .12s;
+}
+.unit-card:hover{transform:translateY(-3px); box-shadow:0 18px 36px -14px rgba(15,32,55,.32); text-decoration:none; border-color:var(--card-accent);}
+.unit-card.unit-card-severe{border-top-color:var(--red);}
+.unit-card-head{display:flex; align-items:flex-start; justify-content:space-between; gap:12px;}
+.unit-card-icon{width:52px; height:52px; border-radius:14px; display:flex; align-items:center; justify-content:center; flex-shrink:0; font-size:17px;}
+.unit-card-name{font-size:16.5px; font-weight:800; color:var(--ink); line-height:1.3; text-decoration:none; display:inline-block;}
+a.unit-card-name:hover{color:var(--sky); text-decoration:underline;}
+.unit-card-sub{font-size:12px; color:var(--ink-soft); margin-top:2px; font-weight:500;}
+.unit-card-badge{font-size:11.5px; font-weight:700; padding:5px 12px; border-radius:20px; white-space:nowrap; flex-shrink:0;}
+.unit-card-stats{display:flex; flex-wrap:wrap; gap:7px; margin-top:16px; padding-top:14px; border-top:1px solid rgba(15,32,55,.07);}
+.unit-card-stats .unit-card-stat{font-size:11px; font-weight:700; padding:4.5px 11px; border-radius:20px; display:inline-flex; align-items:center; gap:4px; white-space:nowrap;}
+.unit-card-children{margin-top:14px; padding-top:14px; border-top:1px dashed rgba(15,32,55,.14); display:flex; flex-direction:column; gap:7px;}
+.unit-card-child{display:flex; align-items:center; justify-content:space-between; gap:8px; font-size:12px;}
+.unit-card-child a{color:var(--ink); font-weight:600;}
+.unit-card-child a:hover{color:var(--sky);}
+/* Stacked row label: bold primary name with its parent location in
+   smaller grey text directly underneath, in one cell — used for county,
+   sub-county, and facility rows so every table in the app lists locations
+   the same way. */
+.row-label{display:block; font-weight:700; color:var(--ink); font-size:13px;}
+a.row-label{color:var(--ink);}
+a.row-label:hover{color:var(--sky); text-decoration:underline;}
+.row-sublabel{display:block; font-size:11.5px; font-weight:500; color:var(--ink-soft); margin-top:1px;}
+/* Nested sub-county rows sit indented directly under their county row, so
+   the parent name is already obvious from position — repeating it as a
+   sublabel on every child row was pure clutter. Slightly lighter weight
+   instead, just enough to read as "one level down". */
+.row-label-nested{font-weight:600; font-size:12.5px;}
+
+table.heatmap tr.row-band{background:#F7F9FB;}
+table.heatmap tr.row-severe{background:var(--red-bg); box-shadow:inset 3px 0 0 var(--red);}
+table.heatmap tr.row-warn{background:#FDF6F5; box-shadow:inset 3px 0 0 rgba(229,87,75,.4);}
+.mono-severe{font-weight:700; color:var(--red);}
+.mono-faint{color:var(--ink-faint);}
+.pill{display:inline-block; min-width:26px; padding:3px 10px; border-radius:20px; font-size:11.5px; font-weight:700; text-align:center;}
+.pill.GREEN{background:var(--green-bg); color:#1F5C2E;}
 .pill.AMBER{background:var(--amber); color:#4A3405;}
 .pill.RED{background:var(--red); color:#fff;}
-.pill.na{background:#EEF1F4; color:#9AA3AF;}
+.pill.PURPLE{background:var(--purple-bg); color:var(--purple);}
+.pill.TEAL{background:var(--teal-bg); color:#0F5F58;}
+
+/* Commodity identity chip — a small tinted, colored-dot icon in front of a
+   commodity's name, one consistent color per commodity reused everywhere
+   it appears (this table, the donut chart, the trend chart) so a
+   commodity is recognizable by color across the whole app. Color comes
+   from the view as an inline style (per-commodity, from Python) since it
+   varies row to row; this class only supplies the shape. Turns what used
+   to be a flat grey mono table into something with an actual visual
+   identity per row — see build_balance_summary()/COMMODITY_COLOR_MAP. */
+.row-identity{display:inline-flex; align-items:center; gap:10px;}
+.commodity-chip{
+  width:26px; height:26px; border-radius:8px; flex-shrink:0;
+  display:flex; align-items:center; justify-content:center;
+}
+.commodity-chip .dot{width:9px; height:9px; border-radius:50%;}
+
+/* Decorative color-cycled dot for geography/facility/CHP-area rows — these
+   rows have no inherent "identity color" the way a commodity does, but a
+   flat list of black text rows was a big part of the "boring" complaint,
+   so each row gets a small color marker cycling through the same palette
+   used for commodity chips, purely to break up the monotony. */
+.row-dot{width:8px; height:8px; border-radius:50%; display:inline-block; margin-right:8px; flex-shrink:0;}
 
 .bottom-row{display:grid; grid-template-columns:340px 1fr; gap:12px;}
+.bottom-row.bottom-row-even{grid-template-columns:1fr 1fr;}
 @media (max-width: 900px){ .bottom-row{grid-template-columns:1fr;} }
+
+.chart-card{display:flex; flex-direction:column;}
+.chart-card-canvas-wrap{position:relative; flex:1; min-height:220px; margin-top:10px;}
+.donut-legend{display:flex; flex-direction:column; gap:8px; margin-top:12px;}
+.donut-legend-row{display:flex; align-items:center; gap:8px; font-size:12px;}
+.donut-legend-dot{width:9px; height:9px; border-radius:50%; flex-shrink:0;}
+.donut-legend-label{flex:1; color:var(--ink-soft); font-weight:600;}
+.donut-legend-value{font-family:'IBM Plex Mono', monospace; font-weight:700;}
+.donut-empty{
+  flex:1; display:flex; align-items:center; justify-content:center;
+  color:var(--ink-faint); font-size:12.5px; text-align:center; padding:20px 0;
+}
+
+.trend-card{display:flex; flex-direction:column;}
+.trend-card-full{margin-top:12px; padding-bottom:20px;}
+.trend-empty{flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:10px; padding:24px 0; text-align:center;}
+.trend-empty-icon{width:44px; height:44px; border-radius:50%; background:#EEF3F8; display:flex; align-items:center; justify-content:center;}
+.trend-empty-title{font-size:13px; font-weight:600; color:var(--ink-soft);}
+.trend-empty-sub{font-size:12px; color:var(--ink-faint); max-width:320px; line-height:1.5;}
 
 @media (max-width: 860px){
   .dash-layout{flex-direction:column;}
@@ -156,6 +398,29 @@ table.heatmap tr:nth-child(even){background:#FAFBFC;}
 .facility-name{font-size:20px; font-weight:700;}
 .status-badge{font-size:11.5px; font-weight:700; color:var(--red); background:var(--red-bg); padding:4px 10px; border-radius:20px;}
 
+/* Facility drilldown page — mirrors .dash-main's padding/rhythm so this
+   page doesn't read as a bare, unstyled fallback next to the dashboard. */
+.drilldown-page{padding:18px 24px 28px; display:flex; flex-direction:column; gap:14px;}
+.crumb-trail{display:flex; align-items:center; gap:8px; font-size:12.5px; color:var(--ink-soft); flex-wrap:wrap;}
+.crumb-trail a{color:var(--sky); font-weight:600; display:inline-flex; align-items:center;}
+.facility-header-card{display:flex; align-items:center; justify-content:space-between; gap:16px; flex-wrap:wrap;}
+.facility-icon{
+  width:44px; height:44px; border-radius:12px; background:rgba(21,127,251,.16);
+  display:flex; align-items:center; justify-content:center; flex-shrink:0;
+}
+.completeness-banner{
+  display:flex; align-items:flex-start; gap:12px;
+  background:var(--amber-bg); border:1px solid rgba(217,165,68,.35); border-radius:12px; padding:14px 16px;
+}
+.completeness-icon{
+  width:28px; height:28px; border-radius:8px; background:rgba(217,165,68,.22);
+  display:flex; align-items:center; justify-content:center; flex-shrink:0;
+}
+.kpi-row-3{grid-template-columns:repeat(3,1fr);}
+@media (max-width: 760px){ .kpi-row-3{grid-template-columns:1fr;} }
+.kpi-value.na{color:var(--ink-faint); font-family:'IBM Plex Mono', monospace;}
+.pill.NA{background:var(--indigo-bg); color:#8891C7; font-size:10.5px; padding:3px 9px; letter-spacing:.2px;}
+
 .def-tip{position:relative; display:inline-flex; align-items:center; cursor:help;}
 .def-tip .bubble{
   display:none; position:absolute; bottom:130%; left:50%; transform:translateX(-50%);
@@ -177,3 +442,22 @@ table.heatmap tr:nth-child(even){background:#FAFBFC;}
 .auth-card input{width:100%; padding:9px 10px; border:1px solid var(--line); border-radius:8px; margin-bottom:14px; font-family:inherit;}
 
 .empty-note{padding:40px; text-align:center; color:var(--ink-soft);}
+
+/* Upload page — same padding rhythm as the rest of the app (this page had
+   none before, which was a big part of why it looked unfinished). */
+.upload-page{padding:18px 24px 28px; display:flex; flex-direction:column; gap:14px; max-width:900px;}
+.upload-dropzone{
+  border:1.5px dashed var(--line); border-radius:12px; padding:26px 20px;
+  display:flex; flex-direction:column; align-items:center; gap:6px; text-align:center;
+  background:#FBFCFD; cursor:pointer;
+}
+.upload-dropzone:hover{border-color:var(--sky); background:#F5FAFD;}
+.upload-dropzone input[type=file]{
+  margin-top:10px; font-size:12.5px; font-family:inherit; max-width:100%;
+}
+.btn-delete{
+  background:var(--red-bg); border:none; border-radius:8px; padding:7px 9px;
+  cursor:pointer; display:inline-flex; align-items:center; justify-content:center;
+}
+.btn-delete:hover{background:var(--red); }
+.btn-delete:hover svg{stroke:#fff;}

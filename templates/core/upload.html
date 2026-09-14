@@ -1,17 +1,169 @@
 {% extends "base.html" %}
-{% block title %}Upload MOH 748 — Commodity Tracker{% endblock %}
+{% block title %}Upload — Commodity Tracker{% endblock %}
 {% block content %}
-<div class="dash-body" style="max-width:520px;">
+<div class="upload-page">
+
   <div class="card">
-    <div class="card-title">Upload MOH 748</div>
-    <div class="card-sub">One reporting month per file. Uploading a period that already exists replaces its records — nothing is silently merged, and every other period is left untouched.</div>
-    <form method="post" enctype="multipart/form-data" style="margin-top:18px;">
+    <div style="display:flex; align-items:center; gap:12px;">
+      <div class="facility-icon">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#002D63" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="m7 8 5-5 5 5"/><path d="M5 21h14"/></svg>
+      </div>
+      <div>
+        <div class="card-title">Upload MOH 748</div>
+        <div class="card-sub">One reporting month per file &middot; uploading a period that already exists replaces its records &mdash; nothing is silently merged, and every other period is left untouched.</div>
+      </div>
+    </div>
+
+    <form method="post" action="{% url 'upload' %}" enctype="multipart/form-data" style="margin-top:18px;">
       {% csrf_token %}
-      {{ form.file }}
+      <label class="upload-dropzone" for="{{ form.file.id_for_label }}">
+        <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#157FFB" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M17 8l-5-5-5 5"/><path d="M12 3v12"/></svg>
+        <div style="font-weight:700; font-size:13.5px;">Click to choose a workbook</div>
+        <div style="font-size:12px; color:var(--ink-soft);">.xlsx or .xls &middot; the DHIS2 MOH 748 export</div>
+        {{ form.file }}
+      </label>
+      {% if form.file.errors %}<div style="color:var(--red); font-size:12.5px; margin-top:8px;">{{ form.file.errors|striptags }}</div>{% endif %}
       <div style="margin-top:16px;">
         <button type="submit" class="btn btn-primary">Upload</button>
       </div>
     </form>
   </div>
+
+  <div class="card">
+    <div class="card-title">Upload History &middot; MOH 748</div>
+    <div class="card-sub">Every MOH 748 file uploaded so far &middot; delete the ones you don&rsquo;t need &mdash; a superseded upload's records have already been replaced, so removing it is safe.</div>
+
+    <div style="overflow-x:auto; margin-top:12px;">
+      <table class="heatmap">
+        <thead>
+          <tr>
+            <th>Period</th>
+            <th>File</th>
+            <th>Uploaded By</th>
+            <th>Uploaded At</th>
+            <th style="text-align:center;">Facilities</th>
+            <th style="text-align:center;">Records</th>
+            <th style="text-align:center;">Status</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for u in uploads %}
+          <tr>
+            <td style="font-weight:600;">{{ u.period|default:"—" }}</td>
+            <td style="color:var(--ink-soft);">{{ u.source_filename }}</td>
+            <td style="color:var(--ink-soft);">{{ u.uploaded_by.get_full_name|default:u.uploaded_by.username|default:"—" }}</td>
+            <td class="mono" style="font-size:12px;">{{ u.uploaded_at|date:"d M Y, H:i" }}</td>
+            <td style="text-align:center;" class="mono">{{ u.facility_rows_parsed }}</td>
+            <td style="text-align:center;" class="mono">{{ u.live_record_count }}</td>
+            <td style="text-align:center;">
+              {% if u.live_record_count == 0 and u.record_rows_created > 0 %}
+                <span class="pill REPORT">Superseded</span>
+              {% elif u.live_record_count > 0 %}
+                <span class="pill GREEN">Active</span>
+              {% else %}
+                <span class="pill REPORT empty">Empty</span>
+              {% endif %}
+            </td>
+            <td style="text-align:right;">
+              <form method="post" action="{% url 'delete_upload' u.id %}" style="margin:0;" onsubmit="return confirm('Delete this upload ({{ u.source_filename|escapejs }})? This cannot be undone.');">
+                {% csrf_token %}
+                <button type="submit" class="btn-delete" title="Delete this upload">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#E5574B" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/></svg>
+                </button>
+              </form>
+            </td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="8" style="color:var(--ink-soft); padding:20px 8px;">No uploads yet.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="card">
+    <div style="display:flex; align-items:center; gap:12px;">
+      <div class="facility-icon">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#002D63" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="m7 8 5-5 5 5"/><path d="M5 21h14"/></svg>
+      </div>
+      <div>
+        <div class="card-title">Upload CHP Commodity Stock Flow</div>
+        <div class="card-sub">One reporting month per file &middot; the eCHIS export, with its "CHP Commodity Detail" sheet &middot; uploading a period that already exists replaces its records for that period, same as MOH 748.</div>
+      </div>
+    </div>
+
+    <form method="post" action="{% url 'chp_upload' %}" enctype="multipart/form-data" style="margin-top:18px;">
+      {% csrf_token %}
+      <label class="upload-dropzone" for="{{ chp_form.file.id_for_label }}">
+        <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#157FFB" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M17 8l-5-5-5 5"/><path d="M12 3v12"/></svg>
+        <div style="font-weight:700; font-size:13.5px;">Click to choose a workbook</div>
+        <div style="font-size:12px; color:var(--ink-soft);">.xlsx &middot; the eCHIS CHP Commodity Stock Flow export</div>
+        {{ chp_form.file }}
+      </label>
+      {% if chp_form.file.errors %}<div style="color:var(--red); font-size:12.5px; margin-top:8px;">{{ chp_form.file.errors|striptags }}</div>{% endif %}
+      <div style="margin-top:16px;">
+        <button type="submit" class="btn btn-primary">Upload</button>
+      </div>
+    </form>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Upload History &middot; CHP Commodity Stock Flow</div>
+    <div class="card-sub">Every eCHIS export uploaded so far. "Unresolved" and "No CHW mapped" are rows kept and flagged, not dropped &mdash; see the CHP Commodity Stock Flow page's CHP Area filter to find them.</div>
+
+    <div style="overflow-x:auto; margin-top:12px;">
+      <table class="heatmap">
+        <thead>
+          <tr>
+            <th>Period</th>
+            <th>File</th>
+            <th>Uploaded By</th>
+            <th>Uploaded At</th>
+            <th style="text-align:center;">Areas</th>
+            <th style="text-align:center;">Records</th>
+            <th style="text-align:center;">Unresolved</th>
+            <th style="text-align:center;">No CHW Mapped</th>
+            <th style="text-align:center;">Status</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for u in chp_uploads %}
+          <tr>
+            <td style="font-weight:600;">{{ u.period|default:"—" }}</td>
+            <td style="color:var(--ink-soft);">{{ u.source_filename }}</td>
+            <td style="color:var(--ink-soft);">{{ u.uploaded_by.get_full_name|default:u.uploaded_by.username|default:"—" }}</td>
+            <td class="mono" style="font-size:12px;">{{ u.uploaded_at|date:"d M Y, H:i" }}</td>
+            <td style="text-align:center;" class="mono">{{ u.area_rows_parsed }}</td>
+            <td style="text-align:center;" class="mono">{{ u.live_record_count }}</td>
+            <td style="text-align:center;" class="mono{% if u.unresolved_geography_rows == 0 %} mono-faint{% endif %}">{{ u.unresolved_geography_rows }}</td>
+            <td style="text-align:center;" class="mono{% if u.unmapped_chw_rows == 0 %} mono-faint{% endif %}">{{ u.unmapped_chw_rows }}</td>
+            <td style="text-align:center;">
+              {% if u.live_record_count == 0 and u.record_rows_created > 0 %}
+                <span class="pill REPORT">Superseded</span>
+              {% elif u.live_record_count > 0 %}
+                <span class="pill GREEN">Active</span>
+              {% else %}
+                <span class="pill REPORT empty">Empty</span>
+              {% endif %}
+            </td>
+            <td style="text-align:right;">
+              <form method="post" action="{% url 'delete_chp_upload' u.id %}" style="margin:0;" onsubmit="return confirm('Delete this upload ({{ u.source_filename|escapejs }})? This cannot be undone.');">
+                {% csrf_token %}
+                <button type="submit" class="btn-delete" title="Delete this upload">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#E5574B" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/></svg>
+                </button>
+              </form>
+            </td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="10" style="color:var(--ink-soft); padding:20px 8px;">No uploads yet.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
 </div>
 {% endblock %}

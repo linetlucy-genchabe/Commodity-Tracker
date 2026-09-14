@@ -1,27 +1,100 @@
 {% extends "base.html" %}
+{% load static %}
 {% block title %}{{ facility.name }} — Commodity Tracker{% endblock %}
 {% block content %}
-<div class="dash-body">
-  <p><a href="{% url 'home' %}">&larr; Back to dashboard</a></p>
+<div class="drilldown-page">
 
-  <div class="card">
-    <div class="drilldown-header" style="display:flex; justify-content:space-between; align-items:flex-start;">
+  <div class="crumb-trail">
+    <a href="{% url 'home' %}">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px; margin-right:4px;"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+      Back to dashboard
+    </a>
+    <span style="color:var(--ink-faint);">&middot;</span>
+    <span>{{ facility.county.name }}</span>
+    <span style="color:var(--ink-faint);">&rsaquo;</span>
+    <span>{{ facility.sub_county.name }}</span>
+    <span style="color:var(--ink-faint);">&rsaquo;</span>
+    <span>{{ facility.ward.name }}</span>
+  </div>
+
+  <div class="card facility-header-card">
+    <div style="display:flex; align-items:center; gap:14px;">
+      <div class="facility-icon">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#002D63" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21h18"/><path d="M5 21V7l8-4v18"/><path d="M19 21V11l-6-4"/><path d="M9 9v.01M9 12v.01M9 15v.01M9 18v.01"/></svg>
+      </div>
       <div>
-        <div class="breadcrumb">{{ facility.county.name }} &rsaquo; {{ facility.sub_county.name }} &rsaquo; {{ facility.ward.name }}</div>
         <div class="facility-name">{{ facility.name }}</div>
-        <div style="margin-top:8px; display:flex; align-items:center; gap:10px;">
+        <div style="margin-top:6px; display:flex; align-items:center; gap:10px;">
           {% if stockout_count %}<span class="status-badge">{{ stockout_count }} commodit{{ stockout_count|pluralize:"y,ies" }} out of stock</span>{% endif %}
           <span style="font-size:11.5px; font-weight:600; color:var(--ink-soft);">MOH 748 &middot; {{ period_display }}</span>
         </div>
       </div>
-      <form method="get" style="margin:0;">
-        <select name="period" onchange="this.form.submit()" style="border:1px solid var(--line); border-radius:8px; padding:8px 10px;">
-          {% for p in periods %}<option value="{{ p }}" {% if p == period %}selected{% endif %}>{{ p }}</option>{% endfor %}
-        </select>
-      </form>
     </div>
+    <form method="get" style="margin:0;">
+      <select name="period" onchange="this.form.submit()" style="border:1px solid var(--line); border-radius:8px; padding:9px 12px; font-size:13px; font-family:inherit; background:#fff;">
+        {% for p in periods %}<option value="{{ p }}" {% if p == period %}selected{% endif %}>{{ p }}</option>{% endfor %}
+      </select>
+    </form>
+  </div>
 
-    <div style="overflow-x:auto;">
+  {% if missing_fields %}
+  <div class="completeness-banner">
+    <div class="completeness-icon">
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#B9860F" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><path d="M12 9v4M12 17h.01M10.3 3.9 2 18a2 2 0 0 0 1.7 3h16.6a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z"/></svg>
+    </div>
+    <div>
+      <div style="font-weight:700; font-size:13px; color:#5A3E0A;">
+        {{ missing_fields|join:", " }} not recorded for any commodity this period
+      </div>
+      <div style="font-size:12px; color:#7A5A0E; margin-top:3px; line-height:1.5;">
+        The fields below with a dot were left blank on {{ period_display }}'s submission for this facility &mdash; worth a follow-up with the facility in-charge if that wasn't intentional.
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
+  <div class="kpi-row kpi-row-3">
+    <div class="kpi-card">
+      <div class="kpi-head">
+        <div class="kpi-icon reporting"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#002D63" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></div>
+        <div class="kpi-label">Commodities Tracked</div>
+      </div>
+      <div class="kpi-value reporting">{{ commodities_tracked }} <span style="font-size:16px; color:var(--ink-soft); font-weight:600;">/ {{ commodities_total }}</span></div>
+      <div class="kpi-sub">{{ period_display }}</div>
+    </div>
+    <div class="kpi-card{% if stockout_count %} stockout{% endif %}">
+      <div class="kpi-head">
+        <div class="kpi-icon stockout"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#E5574B" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 9v4M12 17h.01M10.3 3.9 2 18a2 2 0 0 0 1.7 3h16.6a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z"/></svg></div>
+        <div class="kpi-label">With a Confirmed Stockout</div>
+      </div>
+      {% if any_days_reported %}
+        <div class="kpi-value stockout">{{ stockout_count }} <span style="font-size:16px; color:var(--ink-soft); font-weight:600;">of {{ commodities_tracked }}</span></div>
+        <div class="kpi-sub">Days Out of Stock, {{ period_display }}</div>
+      {% else %}
+        <div class="kpi-value na">&middot;</div>
+        <div class="kpi-sub">Days Out of Stock not recorded</div>
+      {% endif %}
+    </div>
+    <div class="kpi-card{% if near_expiry_total %} expiry{% elif near_expiry_total == 0 %} expiry-ok{% endif %}">
+      <div class="kpi-head">
+        <div class="kpi-icon{% if near_expiry_total %} expiry{% else %} expiry-ok{% endif %}"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="{% if near_expiry_total %}#6C4F9E{% else %}#3F9A56{% endif %}" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2 4 6v6c0 5 3.4 8.4 8 10 4.6-1.6 8-5 8-10V6l-8-4Z"/></svg></div>
+        <div class="kpi-label">Near-Expiry Items</div>
+      </div>
+      {% if near_expiry_total == None %}
+        <div class="kpi-value na">&middot;</div>
+        <div class="kpi-sub">Not recorded</div>
+      {% else %}
+        <div class="kpi-value{% if near_expiry_total %} expiry{% else %} expiry-ok{% endif %}">{{ near_expiry_total }}</div>
+        <div class="kpi-sub{% if not near_expiry_total %} kpi-sub-ok{% endif %}">{% if near_expiry_total %}&le;6 months to expiry{% else %}None within expiry window{% endif %}</div>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Commodity Detail</div>
+    <div class="card-sub">MOH 748 &middot; {{ period_display }} &middot; per-commodity balances for this facility</div>
+
+    <div style="overflow-x:auto; margin-top:12px;">
       <table class="heatmap">
         <thead>
           <tr>
@@ -43,14 +116,30 @@
         <tbody>
           {% for row in rows %}
           <tr>
-            <td style="font-weight:600;">{{ row.record.get_commodity_display }}</td>
-            <td style="text-align:right;" class="mono">{{ row.record.beginning_balance|default:"–" }}</td>
-            <td style="text-align:right;" class="mono">{{ row.record.quantity_received|default:"–" }}</td>
-            <td style="text-align:right;" class="mono">{{ row.record.total_dispensed|default:"–" }}</td>
-            <td style="text-align:right;" class="mono">{{ row.record.physical_count|default:"–" }}</td>
-            <td style="text-align:right;" class="mono">{{ row.record.near_expiry_6mo|default:"–" }}</td>
-            <td style="text-align:center;" class="mono">{{ row.record.days_out_of_stock|default:"–" }}</td>
-            <td style="text-align:center;">{% if row.status %}<span class="pill {{ row.status }}">&nbsp;</span>{% endif %}</td>
+            <td style="font-weight:600;">
+              <span class="row-identity">
+                <span class="commodity-chip" style="background:{{ row.color }}1F;"><span class="dot" style="background:{{ row.color }};"></span></span>
+                {{ row.record.get_commodity_display }}
+              </span>
+            </td>
+            <td style="text-align:right;" class="mono{% if row.record.beginning_balance == None %} mono-faint{% endif %}">{{ row.record.beginning_balance|default_if_none:"&middot;" }}</td>
+            <td style="text-align:right;" class="mono{% if row.record.quantity_received == None %} mono-faint{% endif %}">{{ row.record.quantity_received|default_if_none:"&middot;" }}</td>
+            <td style="text-align:right;" class="mono{% if row.record.total_dispensed == None %} mono-faint{% endif %}">{{ row.record.total_dispensed|default_if_none:"&middot;" }}</td>
+            <td style="text-align:right;" class="mono{% if row.record.physical_count == None %} mono-faint{% endif %}">{{ row.record.physical_count|default_if_none:"&middot;" }}</td>
+            <td style="text-align:right;">
+              {% if row.record.near_expiry_6mo == None %}<span class="mono mono-faint">&middot;</span>
+              {% elif row.record.near_expiry_6mo == 0 %}<span class="mono">0</span>
+              {% else %}<span class="pill PURPLE">{{ row.record.near_expiry_6mo }}</span>{% endif %}
+            </td>
+            <td style="text-align:center;">
+              {% if row.record.days_out_of_stock == None %}<span class="mono mono-faint">&middot;</span>
+              {% elif row.record.days_out_of_stock == 0 %}<span class="pill GREEN">{{ row.record.days_out_of_stock }}</span>
+              {% elif row.record.days_out_of_stock < 7 %}<span class="pill AMBER">{{ row.record.days_out_of_stock }}</span>
+              {% else %}<span class="pill RED">{{ row.record.days_out_of_stock }}</span>{% endif %}
+            </td>
+            <td style="text-align:center;">
+              {% if row.status %}<span class="pill {{ row.status }}">&nbsp;</span>{% else %}<span class="pill NA">Not recorded</span>{% endif %}
+            </td>
           </tr>
           {% empty %}
           <tr><td colspan="8" style="color:var(--ink-soft); padding:20px 8px;">No MOH 748 data for this facility in {{ period_display }}.</td></tr>
@@ -59,5 +148,126 @@
       </table>
     </div>
   </div>
+
+  <div class="card trend-card trend-card-full" style="margin-top:14px;">
+    <div class="card-title">Days-Out-of-Stock Trend</div>
+    <div class="card-sub">{{ facility.name }} &middot; last {{ trend_months }} months</div>
+    {% if trend_has_history %}
+      <div id="trendChartWrap" style="position:relative; flex:1; min-height:300px; margin-top:10px;">
+        <canvas id="trendChart"></canvas>
+      </div>
+    {% else %}
+      <div class="trend-empty">
+        <div class="trend-empty-icon">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#8FA3B8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M7 15l4-4 3 3 5-6"/><circle cx="19" cy="8" r="1.4" fill="#8FA3B8" stroke="none"/></svg>
+        </div>
+        <div class="trend-empty-title">Only one month uploaded so far</div>
+        <div class="trend-empty-sub">The trend line appears automatically once a second month of MOH 748 data is uploaded for {{ facility.name }} &mdash; {{ period_display }} is currently the only period on file.</div>
+      </div>
+    {% endif %}
+  </div>
 </div>
+
+{% if trend_has_history %}
+<script src="{% static 'js/chart.umd.js' %}"></script>
+<script>
+// Same defensive chart helper used on the main dashboard: if Chart.js
+// didn't load, or the canvas is missing, or the data is malformed, show
+// the real reason right in the card instead of a silent blank box.
+function _renderChartSafely(wrapId, canvasId, build) {
+  const wrap = document.getElementById(wrapId);
+  function showError(msg) {
+    console.error('Chart in #' + wrapId + ' failed to render:', msg);
+    if (wrap) {
+      wrap.innerHTML =
+        '<div style="color:#B23B3B; font-size:12.5px; padding:12px; border:1px dashed #E3B7B7; ' +
+        'border-radius:8px; background:#FBF1F1;">' +
+        '<strong>Chart failed to load.</strong><br>' + msg +
+        '</div>';
+    }
+  }
+  try {
+    if (typeof Chart === 'undefined') {
+      showError(
+        'The chart library (chart.umd.js) did not load. Open ' +
+        '<code>{% static "js/chart.umd.js" %}</code> directly in a new browser tab — ' +
+        'if it 404s or shows an error instead of JavaScript code, that confirms the file ' +
+        "isn't being served (check STATIC_ROOT / that collectstatic has been run if DEBUG is off)."
+      );
+      return;
+    }
+    const ctx = document.getElementById(canvasId);
+    if (!ctx) { showError('Could not find &lt;canvas id="' + canvasId + '"&gt; on the page.'); return; }
+    build(ctx);
+  } catch (err) {
+    showError((err && err.message) ? err.message : String(err));
+  }
+}
+
+_renderChartSafely('trendChartWrap', 'trendChart', function (canvasEl) {
+  const trend = {{ trend_json|safe }};
+  // Same five commodities, same colors, as the main dashboard's trend chart
+  // — one consistent palette everywhere.
+  const COMMODITY_META = [
+    {key: 'LLINS', label: 'LLINs', color: '#2F9BD6'},
+    {key: 'AL_6', label: 'AL 6s', color: '#F0793F'},
+    {key: 'AL_12', label: 'AL 12s', color: '#6C4F9E'},
+    {key: 'AL_18', label: 'AL 18s', color: '#3F9A56'},
+    {key: 'AL_24', label: 'AL 24s', color: '#E5574B'},
+  ];
+  const ctx2d = canvasEl.getContext('2d');
+  const datasets = COMMODITY_META.map(function (c) {
+    const gradient = ctx2d.createLinearGradient(0, 0, 0, 260);
+    gradient.addColorStop(0, c.color + '2E');
+    gradient.addColorStop(1, c.color + '00');
+    return {
+      label: c.label,
+      data: trend.series[c.key],
+      borderColor: c.color,
+      backgroundColor: gradient,
+      pointBackgroundColor: c.color,
+      pointBorderColor: '#fff',
+      pointBorderWidth: 1.5,
+      pointRadius: 3,
+      pointHoverRadius: 5,
+      borderWidth: 2.25,
+      tension: 0.35,
+      fill: true,
+      // A missing month spans as a straight line instead of breaking the
+      // line entirely, so a gap doesn't read as a rendering error.
+      spanGaps: true,
+    };
+  });
+  new Chart(canvasEl, {
+    type: 'line',
+    data: {labels: trend.periods, datasets: datasets},
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: {mode: 'index', intersect: false},
+      plugins: {
+        legend: {
+          position: 'top',
+          align: 'center',
+          fullSize: true,
+          labels: {usePointStyle: true, pointStyle: 'circle', boxWidth: 7, padding: 14, font: {family: "'Public Sans'", size: 11}}
+        }
+      },
+      layout: {padding: {top: 4}},
+      scales: {
+        y: {
+          beginAtZero: true,
+          grid: {color: '#EEF1F4'},
+          title: {display: true, text: 'avg. days out of stock', font: {size: 11}}
+        },
+        x: {
+          grid: {display: false},
+          ticks: {maxRotation: 0, autoSkip: true, font: {size: 10.5}}
+        }
+      }
+    }
+  });
+});
+</script>
+{% endif %}
 {% endblock %}

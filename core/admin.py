@@ -7,6 +7,10 @@ from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin as DjangoUserAdmin
 
 from .models import (
+    CHPArea,
+    CHPCommodityRecord,
+    CHPCommodityUpload,
+    CommunityHealthUnit,
     County,
     Facility,
     FormDefinition,
@@ -97,3 +101,52 @@ class MOH748RecordAdmin(admin.ModelAdmin):
     list_display = ["facility", "period", "commodity", "days_out_of_stock", "physical_count"]
     list_filter = ["period", "commodity"]
     search_fields = ["facility__name"]
+
+
+@admin.register(CommunityHealthUnit)
+class CommunityHealthUnitAdmin(admin.ModelAdmin):
+    list_display = ["name", "sub_county", "facility"]
+    list_filter = ["sub_county__county"]
+    search_fields = ["name"]
+    autocomplete_fields = ["facility"]
+
+
+@admin.register(CHPArea)
+class CHPAreaAdmin(admin.ModelAdmin):
+    # CHW identity fields are shown here deliberately — this is a
+    # staff-only admin screen for data-quality/mapping follow-up, not a
+    # dashboard view. They must never appear in core/templates rendered to
+    # SCHMT/CHMT/Facility In-charge/MEL Lead users.
+    list_display = [
+        "__str__",
+        "county",
+        "community_health_unit",
+        "chw_mapping_status",
+        "geography_status",
+        "external_id",
+    ]
+    list_filter = ["county", "chw_mapping_status", "geography_status"]
+    search_fields = ["name", "external_id", "chw_name", "chw_username"]
+    autocomplete_fields = ["community_health_unit"]
+
+
+@admin.register(CHPCommodityUpload)
+class CHPCommodityUploadAdmin(admin.ModelAdmin):
+    list_display = [
+        "period",
+        "source_filename",
+        "uploaded_by",
+        "uploaded_at",
+        "area_rows_parsed",
+        "record_rows_created",
+        "unresolved_geography_rows",
+        "unmapped_chw_rows",
+    ]
+    list_filter = ["period"]
+
+
+@admin.register(CHPCommodityRecord)
+class CHPCommodityRecordAdmin(admin.ModelAdmin):
+    list_display = ["chp_area", "period", "commodity", "stock_status", "stock_on_hand", "weeks_of_stock"]
+    list_filter = ["period", "commodity", "stock_status"]
+    search_fields = ["chp_area__name", "chp_area__external_id"]
