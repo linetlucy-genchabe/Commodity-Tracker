@@ -333,12 +333,17 @@
     <div style="overflow-x:auto;">
       <table class="heatmap facility-heatmap">
         <colgroup>
-          <col style="width:28%;">
+          <col style="width:23%;">
+          <col style="width:10%;">
           {% for code, label, color in heatmap.commodities %}<col style="width:9%;">{% endfor %}
         </colgroup>
         <thead>
           <tr>
             <th>CHP Area</th>
+            <th style="text-align:center;">
+              Last Received
+              <span class="def-tip">&#9432;<span class="bubble">Most recent reporting month this area recorded any commodity received &mdash; across its whole history, not just the period selected above. By month only; eCHIS doesn't give an exact day.</span></span>
+            </th>
             {% for code, label, color in heatmap.commodities %}<th style="text-align:center;"><span style="display:inline-flex; align-items:flex-start; gap:4px; text-align:left; white-space:normal;"><span style="width:8px; height:8px; border-radius:50%; background:{{ color }}; display:inline-block; flex-shrink:0;"></span>{{ label }}</span></th>{% endfor %}
           </tr>
         </thead>
@@ -359,6 +364,7 @@
                 </span>
               </span>
             </td>
+            <td style="text-align:center;" class="mono{% if not row.last_received_display %} mono-faint{% endif %}">{{ row.last_received_display|default:"never" }}</td>
             {% for cell in row.cells %}
               <td style="text-align:center;">
                 {% if cell %}
@@ -370,7 +376,7 @@
             {% endfor %}
           </tr>
           {% empty %}
-          <tr><td colspan="{{ heatmap.commodities|length|add:1 }}" style="color:var(--ink-soft); padding:20px 8px;">No CHP areas reported for this selection.</td></tr>
+          <tr><td colspan="{{ heatmap.commodities|length|add:2 }}" style="color:var(--ink-soft); padding:20px 8px;">No CHP areas reported for this selection.</td></tr>
           {% endfor %}
         </tbody>
       </table>

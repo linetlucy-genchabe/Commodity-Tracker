@@ -12,7 +12,7 @@ from django.contrib import messages
 from django.contrib.auth.decorators import login_required, user_passes_test
 from django.core.paginator import Paginator
 from django.core.serializers.json import DjangoJSONEncoder
-from django.db.models import Avg, Count, Sum
+from django.db.models import Avg, Count, Max, Sum
 from django.shortcuts import get_object_or_404, redirect, render
 
 from .models import (
@@ -619,6 +619,23 @@ def build_chp_kpis(records_qs, areas_qs):
     }
 
 
+def chp_last_received_by_area(area_ids):
+    """
+    Most recent period (any commodity) each CHP area recorded a nonzero
+    Quantity Received, looked up across the area's ENTIRE history -- not
+    scoped to whatever period is currently selected, since "when did this
+    area last get supplied" is a question about its whole record, not just
+    the one month in view. Month-level only: the source data has no
+    day-level receipt date, only which reporting month a delivery landed in.
+    """
+    rows = (
+        CHPCommodityRecord.objects.filter(chp_area_id__in=area_ids, quantity_received__gt=0)
+        .values("chp_area_id")
+        .annotate(last_received_period=Max("period"))
+    )
+    return {row["chp_area_id"]: row["last_received_period"] for row in rows}
+
+
 def build_chp_heatmap(records_qs, *, page_number=1):
     """
     CHP-area-level heatmap, one row per area with a record in records_qs —
@@ -633,6 +650,7 @@ def build_chp_heatmap(records_qs, *, page_number=1):
     areas = list(CHPArea.objects.filter(id__in=area_ids).select_related("community_health_unit__sub_county__county"))
 
     by_area_commodity = {(r.chp_area_id, r.commodity): r for r in records_qs}
+    last_received_by_area = chp_last_received_by_area(area_ids)
 
     rows = []
     for area in areas:
@@ -654,7 +672,17 @@ def build_chp_heatmap(records_qs, *, page_number=1):
                 }
             )
         reporting = sum(1 for cell in cells if cell is not None)
-        rows.append({"area": area, "cells": cells, "_severity": severity, "reporting": reporting})
+        last_received_period = last_received_by_area.get(area.id)
+        rows.append(
+            {
+                "area": area,
+                "cells": cells,
+                "_severity": severity,
+                "reporting": reporting,
+                "last_received_period": last_received_period,
+                "last_received_display": period_display(last_received_period) if last_received_period else None,
+            }
+        )
 
     rows.sort(key=lambda r: (-r["_severity"], (r["area"].name or r["area"].external_id)))
     for row in rows:
