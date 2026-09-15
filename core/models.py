@@ -397,6 +397,16 @@ class CHPCommodity(models.TextChoices):
     them apart means a CHP-only commodity never shows up in a 748 filter
     where it could never have data. Values match eCHIS's own commodity
     codes, so parsing is a direct lookup rather than a name guess.
+
+    The last five (Zinc Sulphate through Dispensing Envelopes) were added
+    at Lynne's request before any upload has included them — she confirmed
+    she doesn't have that data yet but wants them in the table structure
+    now, showing as "not reported" until a future upload carries them. Their
+    string values are a best guess at eCHIS's own commodity codes (seen on
+    the live eCHIS "Balance on Hand" screen, not yet confirmed against a
+    real Commodity Code column) — if a future upload's rows for these get
+    skipped as "unrecognised commodity code" in the upload results, check
+    the actual codes eCHIS sends and update the values here to match.
     """
 
     AL_6 = "act_6", "AL 6s"
@@ -407,6 +417,11 @@ class CHPCommodity(models.TextChoices):
     AMOXICILLIN_DT250 = "dt_250", "Amoxicillin 250mg DT"
     ORS_ZINC = "ors_zinc", "Zinc / ORS Co-Pack"
     ORS_SACHETS = "ors_sachets", "ORS Sachets"
+    ZINC_SULPHATE = "zinc", "Zinc Sulphate 20mg Tablets"
+    PARACETAMOL = "pcm", "Paracetamol (PCM)"
+    GLUCOMETER_STRIPS = "glucometer_strips", "Glucometer Strips"
+    GLOVES = "gloves", "Gloves"
+    DISPENSING_ENVELOPES = "dispensing_envelopes", "Medical Dispensing Envelopes"
 
 
 class CHPCommodityStockStatus(models.TextChoices):

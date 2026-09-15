@@ -445,6 +445,11 @@ CHP_COMMODITY_COLOR_MAP = {
     CHPCommodity.AMOXICILLIN_DT250: "#1F9E93",
     CHPCommodity.ORS_ZINC: "#D64C8C",
     CHPCommodity.ORS_SACHETS: "#B9860F",
+    CHPCommodity.ZINC_SULPHATE: "#7A5CC7",
+    CHPCommodity.PARACETAMOL: "#4C7EF0",
+    CHPCommodity.GLUCOMETER_STRIPS: "#E08A1E",
+    CHPCommodity.GLOVES: "#5FB3A3",
+    CHPCommodity.DISPENSING_ENVELOPES: "#B85C7A",
 }
 
 
@@ -536,6 +541,27 @@ def chp_filter_options(user, *, county_id=None, sub_county_id=None, chu_id=None)
     return {"counties": counties, "sub_counties": sub_counties, "chus": chus, "areas": area_list}
 
 
+def weeks_of_stock_severity(weeks):
+    """
+    Lynne's 4-band read on an average weeks-of-stock figure, used wherever
+    a weeks-of-stock number gets a colored pill on the CHP dashboard: both
+    ends are flagged red (under 2 weeks is stockout/low stock, over 6 weeks
+    is overstocked), and only the middle two bands -- 2-4 weeks (amber),
+    4-6 weeks (green) -- read as a healthy supply position. Replaces the
+    earlier, coarser 3-band version (<1 red / <=2 amber / else green).
+    """
+    if weeks is None:
+        return None
+    weeks = float(weeks)
+    if weeks < 2:
+        return "RED"
+    if weeks < 4:
+        return "AMBER"
+    if weeks <= 6:
+        return "GREEN"
+    return "RED"
+
+
 def build_chp_kpis(records_qs, areas_qs):
     total_in_scope = areas_qs.count()
     reporting = records_qs.values("chp_area_id").distinct().count()
@@ -558,6 +584,7 @@ def build_chp_kpis(records_qs, areas_qs):
 
     avg_weeks = records_qs.aggregate(v=Avg("weeks_of_stock"))["v"]
     avg_weeks = round(float(avg_weeks), 1) if avg_weeks is not None else None
+    avg_weeks_status = weeks_of_stock_severity(avg_weeks)
 
     unresolved_areas = areas_qs.filter(community_health_unit__isnull=True).count()
 
@@ -585,6 +612,8 @@ def build_chp_kpis(records_qs, areas_qs):
         "with_low_stock": with_low_stock,
         "with_low_stock_pct": with_low_stock_pct,
         "avg_weeks": avg_weeks,
+        "avg_weeks_status": avg_weeks_status,
+        "avg_weeks_overstocked": avg_weeks is not None and avg_weeks > 6,
         "unresolved_areas": unresolved_areas,
         "severity": severity,
     }
@@ -723,6 +752,7 @@ def build_chp_balance_summary(records_qs):
         flagged_count = commodity_qs.exclude(service_qty_review_flag="").count()
 
         avg_weeks = agg["avg_weeks_of_stock"]
+        avg_weeks_rounded = round(float(avg_weeks), 1) if avg_weeks is not None else None
         rows.append(
             {
                 "commodity": commodity,
@@ -732,7 +762,9 @@ def build_chp_balance_summary(records_qs):
                 "ending_balance": agg["ending_balance"],
                 "physical_count": agg["physical_count"],
                 "stock_on_hand": agg["stock_on_hand"],
-                "avg_weeks_of_stock": round(float(avg_weeks), 1) if avg_weeks is not None else None,
+                "avg_weeks_of_stock": avg_weeks_rounded,
+                "weeks_status": weeks_of_stock_severity(avg_weeks_rounded),
+                "weeks_overstocked": avg_weeks_rounded is not None and avg_weeks_rounded > 6,
                 "flagged_rows_excluded": flagged_count,
                 "color": CHP_COMMODITY_COLOR_MAP[commodity],
             }

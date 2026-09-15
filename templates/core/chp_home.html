@@ -132,14 +132,16 @@
             <th>Commodity</th>
             <th style="text-align:right;">Begin. Balance</th>
             <th style="text-align:right;">Received</th>
+            <th style="text-align:right;">Stock on Hand</th>
             <th style="text-align:right;">
               Dispensed
               <span class="def-tip">&#9432;<span class="bubble">Excludes rows eCHIS itself flagged as an implausible dispensed quantity (its own "raw total &gt; 10,000 units" review flag) &mdash; those rows' other fields are kept. See the count per row where it applies.</span></span>
             </th>
             <th style="text-align:right;">Ending Balance</th>
-            <th style="text-align:right;">Physical Count</th>
-            <th style="text-align:right;">Stock on Hand</th>
-            <th style="text-align:center;">Avg. Weeks of Stock</th>
+            <th style="text-align:center;">
+              Avg. Weeks of Stock
+              <span class="def-tip">&#9432;<span class="bubble">Red under 2 weeks (stockout/low stock) or over 6 weeks (overstocked) &middot; amber 2&ndash;4 weeks (low/moderate) &middot; green 4&ndash;6 weeks (adequate).</span></span>
+            </th>
           </tr>
         </thead>
         <tbody>
@@ -153,15 +155,12 @@
             </td>
             <td style="text-align:right;" class="mono{% if row.beginning_balance == None %} mono-faint{% endif %}">{{ row.beginning_balance|default_if_none:"&middot;" }}</td>
             <td style="text-align:right;" class="mono{% if row.quantity_received == None %} mono-faint{% endif %}">{{ row.quantity_received|default_if_none:"&middot;" }}</td>
+            <td style="text-align:right;" class="mono{% if row.stock_on_hand == None %} mono-faint{% endif %}">{{ row.stock_on_hand|default_if_none:"&middot;" }}</td>
             <td style="text-align:right;" class="mono{% if row.quantity_dispensed == None %} mono-faint{% endif %}">{{ row.quantity_dispensed|default_if_none:"&middot;" }}{% if row.flagged_rows_excluded %} <span class="row-sublabel" style="display:inline;" title="{{ row.flagged_rows_excluded }} row(s) excluded &mdash; flagged by eCHIS as an implausible quantity">({{ row.flagged_rows_excluded }} excluded)</span>{% endif %}</td>
             <td style="text-align:right;" class="mono{% if row.ending_balance == None %} mono-faint{% endif %}">{{ row.ending_balance|default_if_none:"&middot;" }}</td>
-            <td style="text-align:right;" class="mono{% if row.physical_count == None %} mono-faint{% endif %}">{{ row.physical_count|default_if_none:"&middot;" }}</td>
-            <td style="text-align:right;" class="mono{% if row.stock_on_hand == None %} mono-faint{% endif %}">{{ row.stock_on_hand|default_if_none:"&middot;" }}</td>
             <td style="text-align:center;">
               {% if row.avg_weeks_of_stock == None %}<span class="mono mono-faint">&middot;</span>
-              {% elif row.avg_weeks_of_stock < 1 %}<span class="pill RED">{{ row.avg_weeks_of_stock }}</span>
-              {% elif row.avg_weeks_of_stock <= 2 %}<span class="pill AMBER">{{ row.avg_weeks_of_stock }}</span>
-              {% else %}<span class="pill GREEN">{{ row.avg_weeks_of_stock }}</span>{% endif %}
+              {% else %}<span class="pill {{ row.weeks_status }}">{{ row.avg_weeks_of_stock }}{% if row.weeks_overstocked %} (overstocked){% endif %}</span>{% endif %}
             </td>
           </tr>
           {% endfor %}
@@ -311,9 +310,7 @@
               {% else %}<span class="unit-card-stat pill GREEN">0% stockout</span>{% endif %}
               {% if row.kpis.with_low_stock > 0 %}<span class="unit-card-stat pill AMBER">{{ row.kpis.with_low_stock_pct }}% low stock ({{ row.kpis.with_low_stock }} of {{ row.kpis.reporting }})</span>{% else %}<span class="unit-card-stat pill GREEN">0% low stock</span>{% endif %}
               {% if row.kpis.avg_weeks == None %}<span class="unit-card-stat" style="background:#EEF1F4; color:var(--ink-faint);">no weeks data</span>
-              {% elif row.kpis.avg_weeks < 1 %}<span class="unit-card-stat pill RED">avg {{ row.kpis.avg_weeks }} wks of stock left</span>
-              {% elif row.kpis.avg_weeks <= 2 %}<span class="unit-card-stat pill AMBER">avg {{ row.kpis.avg_weeks }} wks of stock left</span>
-              {% else %}<span class="unit-card-stat pill GREEN">avg {{ row.kpis.avg_weeks }} wks of stock left</span>{% endif %}
+              {% else %}<span class="unit-card-stat pill {{ row.kpis.avg_weeks_status }}">avg {{ row.kpis.avg_weeks }} wks of stock left{% if row.kpis.avg_weeks_overstocked %} (overstocked){% endif %}</span>{% endif %}
             </div>
           </a>
         {% endif %}
