@@ -179,16 +179,20 @@
       <table class="heatmap">
         <thead>
           <tr>
-            <th>Commodity</th>
-            <th style="text-align:right;">Begin. Balance</th>
-            <th style="text-align:right;">Received</th>
+            <th>Drug Name</th>
+            <th style="text-align:right;">A. Begin. Balance</th>
+            <th style="text-align:right;">B. Received</th>
             <th style="text-align:right;">
-              Dispensed
+              C. Dispensed
               <span class="def-tip">&#9432;<span class="bubble">Excludes rows eCHIS itself flagged as an implausible dispensed quantity &mdash; those rows' other fields are kept.</span></span>
             </th>
-            <th style="text-align:right;">Physical Count</th>
+            <th style="text-align:right;">
+              D. Losses (Excl. Expiries)
+              <span class="def-tip">&#9432;<span class="bubble">Not present in eCHIS's export at this reporting grain &mdash; eCHIS records stock amendments/discrepancies as separate events, not a direct Losses field. Always blank here.</span></span>
+            </th>
+            <th style="text-align:right;">E. Balance / Physical Count</th>
             <th style="text-align:center;">
-              Est. Days Out of Stock
+              F. Est. Days Out of Stock
               <span class="def-tip">&#9432;<span class="bubble">Estimated from eCHIS's Stockout/Low stock/Adequate status, not a measured day count. Adequate &rarr; 0, Low stock &rarr; the draft amber threshold, Stockout &rarr; the whole reporting month.</span></span>
             </th>
           </tr>
@@ -199,13 +203,14 @@
             <td style="font-weight:600;">
               <span class="row-identity">
                 <span class="commodity-chip" style="background:{{ row.color }}1F;"><span class="dot" style="background:{{ row.color }};"></span></span>
-                {{ row.commodity.label }}
+                {{ row.commodity_label }}
               </span>
             </td>
             {% if row.available %}
               <td style="text-align:right;" class="mono{% if row.beginning_balance == None %} mono-faint{% endif %}">{{ row.beginning_balance|default_if_none:"&middot;" }}</td>
               <td style="text-align:right;" class="mono{% if row.quantity_received == None %} mono-faint{% endif %}">{{ row.quantity_received|default_if_none:"&middot;" }}</td>
               <td style="text-align:right;" class="mono{% if row.total_dispensed == None %} mono-faint{% endif %}">{{ row.total_dispensed|default_if_none:"&middot;" }}{% if row.flagged_rows_excluded %} <span class="row-sublabel" style="display:inline;" title="{{ row.flagged_rows_excluded }} row(s) excluded &mdash; flagged by eCHIS as an implausible quantity">({{ row.flagged_rows_excluded }} excluded)</span>{% endif %}</td>
+              <td style="text-align:right;" class="mono mono-faint" title="Not available from eCHIS">&middot;</td>
               <td style="text-align:right;" class="mono{% if row.physical_count == None %} mono-faint{% endif %}">{{ row.physical_count|default_if_none:"&middot;" }}</td>
               <td style="text-align:center;">
                 {% if row.estimated_days_out_of_stock == None %}<span class="mono mono-faint">&middot;</span>
@@ -214,10 +219,50 @@
                 {% else %}<span class="pill RED">{{ row.estimated_days_out_of_stock }}</span>{% endif %}
               </td>
             {% else %}
-              <td colspan="5" style="text-align:center; color:var(--ink-faint); font-style:italic;">Not available from eCHIS</td>
+              <td colspan="6" style="text-align:center; color:var(--ink-faint); font-style:italic;">Not available from eCHIS</td>
             {% endif %}
           </tr>
           {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <div class="card-sub" style="margin-top:20px; font-weight:600; color:var(--ink-soft);">Summary for Weight Band / Age Category</div>
+    <div style="overflow-x:auto; margin-top:8px;">
+      <table class="heatmap">
+        <thead>
+          <tr>
+            <th>Drug Name</th>
+            <th style="text-align:center;">5 to &lt;15kg<br>&lt;3yrs</th>
+            <th style="text-align:center;">15 to &lt;25kg<br>3-8yrs</th>
+            <th style="text-align:center;">25 to &lt;35kg<br>8-12yrs</th>
+            <th style="text-align:center;">&ge;35kg<br>&ge;12yrs</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td colspan="5" style="text-align:center; color:var(--ink-faint); font-style:italic;">Not available from eCHIS &mdash; this breakdown isn't part of the CHP Commodity Stock Flow data</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="card-sub" style="margin-top:20px; font-weight:600; color:var(--ink-soft);">Suspected Cases</div>
+    <div style="overflow-x:auto; margin-top:8px;">
+      <table class="heatmap">
+        <thead>
+          <tr>
+            <th></th>
+            <th style="text-align:center;">&lt;5 Yrs</th>
+            <th style="text-align:center;">&ge;5 Yrs</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td>No. Positive</td><td colspan="2" class="mono mono-faint" style="text-align:center;">Not available from eCHIS</td></tr>
+          <tr><td>No. Negative</td><td colspan="2" class="mono mono-faint" style="text-align:center;">Not available from eCHIS</td></tr>
+          <tr><td>No. Not Tested</td><td colspan="2" class="mono mono-faint" style="text-align:center;">Not available from eCHIS</td></tr>
+          <tr><td>No. Invalid</td><td colspan="2" class="mono mono-faint" style="text-align:center;">Not available from eCHIS</td></tr>
+          <tr><td style="font-weight:600;">Total</td><td colspan="2" class="mono mono-faint" style="text-align:center;">Not available from eCHIS</td></tr>
         </tbody>
       </table>
     </div>

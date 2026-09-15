@@ -811,11 +811,16 @@ def build_chp_balance_summary(records_qs):
 # CHU-to-facility mapping arrives and it becomes possible to actually attach
 # one of these to a facility.
 #
-# Only the four AL pack sizes have any eCHIS equivalent. LLINs and the
-# CHP-only commodities (RDTs, Amoxicillin, Zinc/ORS, ORS Sachets) simply
-# have no 748 slot — LLINs is shown as "not available from eCHIS" rather
-# than silently missing from a "748" table; the CHP-only four don't appear
-# at all, because 748 itself doesn't track them.
+# The physical MOH 748 form's main table tracks AL 6s/12s/18s/24s plus
+# Malaria RDTs — five rows, columns A-F (Beginning Balance, Quantity
+# Received, Total Dispensed, Losses Excl. Expiries, Balance/Physical
+# Count, Days Out of Stock). RDTs has no Commodity (748) enum member of
+# its own — 748's Commodity enum only ever needed LLINs + the four AL
+# sizes — so it's listed here directly as (CHPCommodity, label, color)
+# rather than through a CHP-commodity -> Commodity mapping. LLINs is on
+# the physical form too but has no CHP Commodity Stock Flow equivalent at
+# all, so it's appended after the loop, always "not available from eCHIS"
+# (same pattern used for the Losses column below — see that column's note).
 # ---------------------------------------------------------------------------
 
 CHP_TO_MOH748_COMMODITY = {
@@ -824,6 +829,14 @@ CHP_TO_MOH748_COMMODITY = {
     CHPCommodity.AL_18: Commodity.AL_18,
     CHPCommodity.AL_24: Commodity.AL_24,
 }
+
+MOH748_PREVIEW_ROWS = [
+    (CHPCommodity.AL_6, Commodity.AL_6.label, COMMODITY_COLOR_MAP[Commodity.AL_6]),
+    (CHPCommodity.AL_12, Commodity.AL_12.label, COMMODITY_COLOR_MAP[Commodity.AL_12]),
+    (CHPCommodity.AL_18, Commodity.AL_18.label, COMMODITY_COLOR_MAP[Commodity.AL_18]),
+    (CHPCommodity.AL_24, Commodity.AL_24.label, COMMODITY_COLOR_MAP[Commodity.AL_24]),
+    (CHPCommodity.RDTS, "Malaria RDTs", CHP_COMMODITY_COLOR_MAP[CHPCommodity.RDTS]),
+]
 
 
 def estimate_days_out_of_stock(stock_status, period):
@@ -871,22 +884,31 @@ def build_chp_moh748_preview(records_qs):
     itself flagged as an implausible Quantity Dispensed value are excluded
     from total_dispensed only, with the excluded count returned so the
     preview can say so.
+
+    losses_excl_expiries is always None — column D on the physical form,
+    genuinely not present anywhere in eCHIS's export at this reporting
+    grain (confirmed against the Data Dictionary sheet of Lynne's own
+    source workbook: "Requested columns included but blank... eCHIS has
+    separate stock amendment/discrepancy events, not direct positive/
+    negative fields"). Kept as an explicit blank column, same "shown but
+    marked unavailable" treatment as the LLINs row, rather than dropped.
     """
     rows = []
-    for chp_commodity, moh_commodity in CHP_TO_MOH748_COMMODITY.items():
+    for chp_commodity, label, color in MOH748_PREVIEW_ROWS:
         commodity_qs = records_qs.filter(commodity=chp_commodity)
         if not commodity_qs.exists():
             rows.append(
                 {
-                    "commodity": moh_commodity,
+                    "commodity_label": label,
                     "available": False,
                     "beginning_balance": None,
                     "quantity_received": None,
                     "total_dispensed": None,
+                    "losses_excl_expiries": None,
                     "physical_count": None,
                     "estimated_days_out_of_stock": None,
                     "flagged_rows_excluded": 0,
-                    "color": COMMODITY_COLOR_MAP[moh_commodity],
+                    "color": color,
                 }
             )
             continue
@@ -909,15 +931,16 @@ def build_chp_moh748_preview(records_qs):
 
         rows.append(
             {
-                "commodity": moh_commodity,
+                "commodity_label": label,
                 "available": True,
                 "beginning_balance": agg["beginning_balance"],
                 "quantity_received": agg["quantity_received"],
                 "total_dispensed": dispensed_agg["total_dispensed"],
+                "losses_excl_expiries": None,
                 "physical_count": agg["physical_count"],
                 "estimated_days_out_of_stock": avg_days_out,
                 "flagged_rows_excluded": flagged_count,
-                "color": COMMODITY_COLOR_MAP[moh_commodity],
+                "color": color,
             }
         )
 
@@ -925,11 +948,12 @@ def build_chp_moh748_preview(records_qs):
     # add it explicitly so it's visibly "not available", not just absent.
     rows.append(
         {
-            "commodity": Commodity.LLINS,
+            "commodity_label": Commodity.LLINS.label,
             "available": False,
             "beginning_balance": None,
             "quantity_received": None,
             "total_dispensed": None,
+            "losses_excl_expiries": None,
             "physical_count": None,
             "estimated_days_out_of_stock": None,
             "flagged_rows_excluded": 0,
