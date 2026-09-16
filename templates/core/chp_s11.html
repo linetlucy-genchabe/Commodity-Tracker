@@ -95,11 +95,15 @@
         <div class="card-title" style="margin:0;">Generated S11</div>
         <span class="pill" style="background:var(--amber-bg); color:#4A3405; font-weight:700;">GENERATED &middot; not an uploaded submission</span>
       </div>
+      {% if scoped_to_one_chu %}
       <a href="{% url 'chp_export_s11' %}?{{ request.GET.urlencode }}" class="btn-download"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/></svg>Download CSV</a>
+      {% endif %}
     </div>
-    <div class="card-sub">Requisition and Issue Voucher &middot; one draft per Community Health Unit in the scope selected on the left &middot; {{ period_display }}. Not written to any facility's real S11 record.</div>
+    <div class="card-sub">Requisition and Issue Voucher &middot; one draft per Community Health Unit &middot; {{ period_display }}. Not written to any facility's real S11 record.</div>
 
-    {% if not s11.vouchers %}
+    {% if not scoped_to_one_chu %}
+      <div class="empty-note">Select a Community Health Unit (or a specific CHP within one) from the filters on the left to generate its S11 voucher.</div>
+    {% elif not s11.vouchers %}
       <div class="empty-note">No CHU has eCHIS data for this scope/period yet.</div>
     {% endif %}
 

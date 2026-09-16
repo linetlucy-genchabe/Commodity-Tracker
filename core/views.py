@@ -1776,13 +1776,20 @@ def chp_moh748_page(request):
 def chp_s11_page(request):
     """
     The standalone "S11" nav tab — a draft Form S11 (Requisition and Issue
-    Voucher), one card per CHU in the current scope, generated from
-    whatever eCHIS backend data (CHP Commodity Stock Flow) is on file.
-    Shares scope resolution, period presets and geography filters with the
-    MOH 748 and CHP Stock Flow pages (_chp_resolve_scope, chp_filter_options,
-    chp_period_presets), so all three never disagree about what's in view
-    for the same filter selection. See _build_chp_s11_vouchers()'s docstring
-    for what is and isn't populated from real data on this page.
+    Voucher), generated from whatever eCHIS backend data (CHP Commodity
+    Stock Flow) is on file. Shares scope resolution, period presets and
+    geography filters with the MOH 748 and CHP Stock Flow pages
+    (_chp_resolve_scope, chp_filter_options, chp_period_presets), so all
+    three never disagree about what's in view for the same filter
+    selection. See _build_chp_s11_vouchers()'s docstring for what is and
+    isn't populated from real data on this page.
+
+    Requires narrowing to one CHU (or one CHP within it) before a voucher
+    is shown — Lynne was explicit that a county- or sub-county-wide scope
+    should not dump every CHU's voucher onto one page ("don't just show
+    every CHU on the same view"). Same "choose" idea as the CHP Stock Flow
+    dashboard's own drill-down: filter first, see one voucher, not a wall
+    of them to page through.
     """
     scope = _chp_resolve_scope(request)
     user = scope["user"]
@@ -1808,6 +1815,12 @@ def chp_s11_page(request):
     except ValueError:
         page_number = 1
 
+    # Same narrowing rule chp_commodity_home uses for level == "area": a
+    # CHU or a specific CHP within it. Anything broader (county, sub-county,
+    # or the sub-county "choose CHUs or CHP areas" screen) shows a prompt
+    # instead of building every voucher in scope.
+    scoped_to_one_chu = bool(chu_id or area_id)
+
     context = {
         "no_data": not scope["periods"],
         "periods": scope["periods"],
@@ -1828,7 +1841,12 @@ def chp_s11_page(request):
         "selected_county_name": selected_county_name,
         "selected_sub_county_name": selected_sub_county_name,
         "selected_area_name": selected_area_name,
-        "s11": build_chp_s11_summary(scope["records"], scope["filtered_areas"], page_number=page_number),
+        "scoped_to_one_chu": scoped_to_one_chu,
+        "s11": (
+            build_chp_s11_summary(scope["records"], scope["filtered_areas"], page_number=page_number)
+            if scoped_to_one_chu
+            else None
+        ),
     }
     return render(request, "core/chp_s11.html", context)
 
