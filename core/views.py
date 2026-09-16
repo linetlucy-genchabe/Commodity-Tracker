@@ -7,6 +7,7 @@ README "Project layout".
 import calendar
 import csv
 import json
+from datetime import date
 
 from django import forms
 from django.contrib import messages
@@ -464,6 +465,88 @@ def chp_available_periods():
     )
 
 
+def _shift_month(d, months):
+    """d is always day=1; shift by `months` (negative goes back)."""
+    m = d.month - 1 + months
+    y = d.year + m // 12
+    m = m % 12 + 1
+    return date(y, m, 1)
+
+
+def _ym(d):
+    return f"{d.year:04d}-{d.month:02d}"
+
+
+def chp_period_presets():
+    """
+    Calendar-based period-filter shortcuts Lynne asked for: Current Month /
+    Last Month / Last 2 Months / Last Full Quarter -- computed from today's
+    real date, not from what data happens to exist, so a shortcut for a
+    period nothing has been uploaded for yet still shows up (and the page
+    renders blank), exactly as she asked ("whether with data or not").
+
+    "Last 2 Months" is the two most recently COMPLETED months, excluding
+    the current one in progress -- e.g. in September, that's July+August,
+    not August+September. "Last Full Quarter" is the calendar quarter
+    before the one the current month falls in, since that one isn't over
+    yet -- e.g. in September (Q3: Jul-Sep), that's Q2 (Apr-Jun).
+
+    Each entry's period/start/end are plain "YYYY-MM" strings, safe to
+    compare lexicographically (period__gte/__lte) since they're always
+    zero-padded.
+    """
+    this_month = date(date.today().year, date.today().month, 1)
+    current = this_month
+    last_month = _shift_month(this_month, -1)
+    two_months_ago = _shift_month(this_month, -2)
+
+    current_quarter_start_month = ((this_month.month - 1) // 3) * 3 + 1
+    current_quarter_start = date(this_month.year, current_quarter_start_month, 1)
+    last_full_quarter_end = _shift_month(current_quarter_start, -1)
+    last_full_quarter_start = _shift_month(last_full_quarter_end, -2)
+
+    return [
+        {
+            "key": "current_month",
+            "label": "Current Month",
+            "kind": "single",
+            "period": _ym(current),
+            "display": period_display(_ym(current)),
+        },
+        {
+            "key": "last_month",
+            "label": "Last Month",
+            "kind": "single",
+            "period": _ym(last_month),
+            "display": period_display(_ym(last_month)),
+        },
+        {
+            "key": "last_2_months",
+            "label": "Last 2 Months",
+            "kind": "range",
+            "start": _ym(two_months_ago),
+            "end": _ym(last_month),
+            "display": f"{period_display(_ym(two_months_ago))} – {period_display(_ym(last_month))}",
+        },
+        {
+            "key": "last_full_quarter",
+            "label": "Last Full Quarter",
+            "kind": "range",
+            "start": _ym(last_full_quarter_start),
+            "end": _ym(last_full_quarter_end),
+            "display": f"{period_display(_ym(last_full_quarter_start))} – {period_display(_ym(last_full_quarter_end))}",
+        },
+    ]
+
+
+def chp_resolve_period_range(range_key):
+    """(start, end) "YYYY-MM" tuple for a range preset key, or None if unknown."""
+    for preset in chp_period_presets():
+        if preset["key"] == range_key and preset["kind"] == "range":
+            return preset["start"], preset["end"]
+    return None
+
+
 def chp_scoped_areas(user):
     """
     CHP Areas this user is allowed to see. Kept independent of
@@ -790,7 +873,7 @@ def build_chp_geo_summary(records_qs, areas_qs, *, group_by):
     return rows
 
 
-def build_chp_balance_summary(records_qs):
+def build_chp_balance_summary(records_qs, *, period_range=None):
     """
     Per-commodity stock-flow totals (beginning balance, received, dispensed,
     ending balance, physical count, stock on hand, avg. weeks of stock)
@@ -811,33 +894,57 @@ def build_chp_balance_summary(records_qs):
     in every sum; only Quantity Dispensed is excluded for the flagged rows,
     and the number excluded is returned so the page can say so rather than
     quietly dropping data.
+
+    period_range, when given, is an (earliest, latest) "YYYY-MM" tuple —
+    the multi-month rollups behind Last 2 Months / Last Full Quarter.
+    records_qs already spans every period in the range; Received,
+    Dispensed and Avg Weeks of Stock genuinely happened/applied across the
+    whole range, so they still sum/average over all of it, but Beginning
+    Balance comes from the range's first month only and Ending Balance /
+    Physical Count / Stock on Hand (the "current state" figures) come from
+    its last month only — summing those across months would double-count
+    stock that was never actually received twice.
     """
     rows = []
     for commodity in CHPCommodity:
         commodity_qs = records_qs.filter(commodity=commodity)
-        agg = commodity_qs.aggregate(
-            beginning_balance=Sum("beginning_balance"),
+
+        flow_agg = commodity_qs.aggregate(
             quantity_received=Sum("quantity_received"),
-            ending_balance=Sum("ending_balance"),
-            physical_count=Sum("physical_count"),
-            stock_on_hand=Sum("stock_on_hand"),
             avg_weeks_of_stock=Avg("weeks_of_stock"),
         )
+
+        if period_range:
+            earliest, latest = period_range
+            beginning_balance = commodity_qs.filter(period=earliest).aggregate(v=Sum("beginning_balance"))["v"]
+            state_agg = commodity_qs.filter(period=latest).aggregate(
+                ending_balance=Sum("ending_balance"),
+                physical_count=Sum("physical_count"),
+                stock_on_hand=Sum("stock_on_hand"),
+            )
+        else:
+            beginning_balance = commodity_qs.aggregate(v=Sum("beginning_balance"))["v"]
+            state_agg = commodity_qs.aggregate(
+                ending_balance=Sum("ending_balance"),
+                physical_count=Sum("physical_count"),
+                stock_on_hand=Sum("stock_on_hand"),
+            )
+
         clean_qs = commodity_qs.filter(service_qty_review_flag="")
         dispensed_agg = clean_qs.aggregate(quantity_dispensed=Sum("quantity_dispensed"))
         flagged_count = commodity_qs.exclude(service_qty_review_flag="").count()
 
-        avg_weeks = agg["avg_weeks_of_stock"]
+        avg_weeks = flow_agg["avg_weeks_of_stock"]
         avg_weeks_rounded = round(float(avg_weeks), 1) if avg_weeks is not None else None
         rows.append(
             {
                 "commodity": commodity,
-                "beginning_balance": agg["beginning_balance"],
-                "quantity_received": agg["quantity_received"],
+                "beginning_balance": beginning_balance,
+                "quantity_received": flow_agg["quantity_received"],
                 "quantity_dispensed": dispensed_agg["quantity_dispensed"],
-                "ending_balance": agg["ending_balance"],
-                "physical_count": agg["physical_count"],
-                "stock_on_hand": agg["stock_on_hand"],
+                "ending_balance": state_agg["ending_balance"],
+                "physical_count": state_agg["physical_count"],
+                "stock_on_hand": state_agg["stock_on_hand"],
                 "avg_weeks_of_stock": avg_weeks_rounded,
                 "weeks_status": weeks_of_stock_severity(avg_weeks_rounded),
                 "weeks_overstocked": avg_weeks_rounded is not None and avg_weeks_rounded > 6,
@@ -919,7 +1026,7 @@ def estimate_days_out_of_stock(stock_status, period):
     return None
 
 
-def build_chp_moh748_preview(records_qs):
+def build_chp_moh748_preview(records_qs, *, period_range=None):
     """
     A 748-shaped preview built from whatever CHP-area scope is currently in
     view. estimated_days_out_of_stock is the average of the per-record
@@ -940,6 +1047,12 @@ def build_chp_moh748_preview(records_qs):
     separate stock amendment/discrepancy events, not direct positive/
     negative fields"). Kept as an explicit blank column, same "shown but
     marked unavailable" treatment as the LLINs row, rather than dropped.
+
+    period_range, when given, is an (earliest, latest) "YYYY-MM" tuple —
+    same Last 2 Months / Last Full Quarter rollup as
+    build_chp_balance_summary(): Beginning Balance from the range's first
+    month, Physical Count from its last month, Received/Dispensed/the
+    days-out-of-stock estimate summed or averaged across the whole range.
     """
     rows = []
     for chp_commodity, label, color in MOH748_PREVIEW_ROWS:
@@ -961,11 +1074,16 @@ def build_chp_moh748_preview(records_qs):
             )
             continue
 
-        agg = commodity_qs.aggregate(
-            beginning_balance=Sum("beginning_balance"),
-            quantity_received=Sum("quantity_received"),
-            physical_count=Sum("physical_count"),
-        )
+        flow_agg = commodity_qs.aggregate(quantity_received=Sum("quantity_received"))
+
+        if period_range:
+            earliest, latest = period_range
+            beginning_balance = commodity_qs.filter(period=earliest).aggregate(v=Sum("beginning_balance"))["v"]
+            physical_count = commodity_qs.filter(period=latest).aggregate(v=Sum("physical_count"))["v"]
+        else:
+            beginning_balance = commodity_qs.aggregate(v=Sum("beginning_balance"))["v"]
+            physical_count = commodity_qs.aggregate(v=Sum("physical_count"))["v"]
+
         clean_qs = commodity_qs.filter(service_qty_review_flag="")
         dispensed_agg = clean_qs.aggregate(total_dispensed=Sum("quantity_dispensed"))
         flagged_count = commodity_qs.exclude(service_qty_review_flag="").count()
@@ -981,11 +1099,11 @@ def build_chp_moh748_preview(records_qs):
             {
                 "commodity_label": label,
                 "available": True,
-                "beginning_balance": agg["beginning_balance"],
-                "quantity_received": agg["quantity_received"],
+                "beginning_balance": beginning_balance,
+                "quantity_received": flow_agg["quantity_received"],
                 "total_dispensed": dispensed_agg["total_dispensed"],
                 "losses_excl_expiries": None,
-                "physical_count": agg["physical_count"],
+                "physical_count": physical_count,
                 "estimated_days_out_of_stock": avg_days_out,
                 "flagged_rows_excluded": flagged_count,
                 "color": color,
@@ -1242,15 +1360,29 @@ def facility_drilldown(request, facility_id):
 @login_required
 def _chp_resolve_scope(request):
     """
-    GET-param resolution shared by the CHP dashboard and its three CSV
-    downloads (Balances / Generated 748 / CHP Stock Status), so a download
-    always reflects exactly the period + geography filters on screen —
-    never the whole table regardless of what's selected.
+    GET-param resolution shared by the CHP dashboard, the Generated MOH 748
+    page, and their CSV downloads, so a download always reflects exactly
+    the period + geography filters on screen — never the whole table
+    regardless of what's selected.
+
+    Two period modes: ?period=YYYY-MM picks one month, as always. ?range=
+    one of chp_period_presets()'s range keys (currently "last_2_months" or
+    "last_full_quarter") picks a multi-month window instead -- "records" is
+    every record across that whole window (period__gte/__lte, safe for
+    these zero-padded "YYYY-MM" strings), "period_range" is the (earliest,
+    latest) tuple the range-aware builder functions need for their
+    Beginning/Ending Balance split, and "latest_records" is just the
+    window's last month -- what the heatmap uses, since a stock-status
+    snapshot can't sensibly be rolled up across months the way a total can.
+    An unrecognised/missing range falls back to single-period mode.
     """
     user = request.user
     areas = chp_scoped_areas(user)
 
     periods = chp_available_periods()
+    range_key = request.GET.get("range") or None
+    resolved_range = chp_resolve_period_range(range_key) if range_key else None
+
     period = request.GET.get("period") or (periods[0] if periods else "")
 
     county_id = request.GET.get("county") or None
@@ -1266,14 +1398,30 @@ def _chp_resolve_scope(request):
     if search_query:
         filtered_areas = filtered_areas.filter(name__icontains=search_query)
 
-    records = CHPCommodityRecord.objects.filter(period=period, chp_area__in=filtered_areas).select_related(
+    base_qs = CHPCommodityRecord.objects.filter(chp_area__in=filtered_areas).select_related(
         "chp_area__community_health_unit__sub_county__county"
     )
+
+    if resolved_range:
+        earliest, latest = resolved_range
+        records = base_qs.filter(period__gte=earliest, period__lte=latest)
+        latest_records = base_qs.filter(period=latest)
+        period_display_label = next(
+            (p["display"] for p in chp_period_presets() if p["key"] == range_key), f"{earliest} – {latest}"
+        )
+    else:
+        range_key = None
+        records = base_qs.filter(period=period)
+        latest_records = records
+        period_display_label = period_display(period)
 
     return {
         "user": user,
         "periods": periods,
         "period": period,
+        "range_key": range_key,
+        "period_range": resolved_range,
+        "period_display_label": period_display_label,
         "county_id": county_id,
         "sub_county_id": sub_county_id,
         "chu_id": chu_id,
@@ -1282,6 +1430,7 @@ def _chp_resolve_scope(request):
         "view_param": view_param,
         "filtered_areas": filtered_areas,
         "records": records,
+        "latest_records": latest_records,
     }
 
 
@@ -1290,6 +1439,8 @@ def chp_commodity_home(request):
     user = scope["user"]
     periods = scope["periods"]
     period = scope["period"]
+    range_key = scope["range_key"]
+    period_range = scope["period_range"]
     county_id = scope["county_id"]
     sub_county_id = scope["sub_county_id"]
     chu_id = scope["chu_id"]
@@ -1298,6 +1449,7 @@ def chp_commodity_home(request):
     view_param = scope["view_param"]
     filtered_areas = scope["filtered_areas"]
     records = scope["records"]
+    latest_records = scope["latest_records"]
 
     # Same drill-down shape as the MOH 748 dashboard: land on a county
     # summary, then sub-county, then a "choose CHUs or CHP areas" screen
@@ -1342,7 +1494,9 @@ def chp_commodity_home(request):
         "no_data": not periods,
         "periods": periods,
         "period": period,
-        "period_display": period_display(period),
+        "period_display": scope["period_display_label"],
+        "period_presets": chp_period_presets(),
+        "selected_range": range_key or "",
         "filters": chp_filter_options(user, county_id=county_id, sub_county_id=sub_county_id, chu_id=chu_id),
         "selected": {
             "county": county_id or "",
@@ -1360,8 +1514,12 @@ def chp_commodity_home(request):
         "selected_area_name": selected_area_name,
     }
 
+    # The heatmap is a point-in-time snapshot (this area's status THIS
+    # month), which doesn't roll up across months the way a total does —
+    # so in range mode it always shows the range's last month, same as
+    # picking that single month on its own would.
     if level == "area":
-        context["heatmap"] = build_chp_heatmap(records, page_number=page_number)
+        context["heatmap"] = build_chp_heatmap(latest_records, page_number=page_number)
     elif level in ("county", "sub_county", "chu"):
         context["geo_summary"] = build_chp_geo_summary(records, filtered_areas, group_by=level)
     # level == "choose": just the two-option screen, no table to build.
@@ -1371,13 +1529,72 @@ def chp_commodity_home(request):
     # KPI row above, so it stays visible (and correctly narrowed) at every
     # drill-down level. This is the "actual balances, not just stockout
     # status" view Lynne asked for alongside the heatmap.
-    context["balance_summary"] = build_chp_balance_summary(records)
+    context["balance_summary"] = build_chp_balance_summary(records, period_range=period_range)
 
     # Preview only — never written to MOH748Record. See
     # build_chp_moh748_preview()'s docstring.
-    context["moh748_preview"] = build_chp_moh748_preview(records)
+    context["moh748_preview"] = build_chp_moh748_preview(records, period_range=period_range)
 
     return render(request, "core/chp_home.html", context)
+
+
+@login_required
+def chp_moh748_page(request):
+    """
+    The standalone "MOH 748" nav tab — the Generated MOH 748 Preview,
+    entirely eCHIS-derived, on its own page rather than embedded under the
+    CHP Stock Flow dashboard. No facility upload is involved and none is
+    required: Lynne was explicit that nobody is uploading a past month's
+    file for this — the 748 shown here is always generated fresh from
+    whatever eCHIS backend data (CHP Commodity Stock Flow) is on file,
+    narrowed by whichever county/sub-county/CHU/CHP filters are selected,
+    exactly like the same table already embedded in the CHP dashboard.
+    Shares its scope resolution, period presets and geography filters with
+    that dashboard (_chp_resolve_scope, chp_filter_options,
+    chp_period_presets) so the two pages never disagree about what's in
+    view for the same filter selection.
+    """
+    scope = _chp_resolve_scope(request)
+    user = scope["user"]
+    county_id = scope["county_id"]
+    sub_county_id = scope["sub_county_id"]
+    chu_id = scope["chu_id"]
+    area_id = scope["area_id"]
+
+    selected_county_name = ""
+    if county_id:
+        selected_county_name = County.objects.filter(id=county_id).values_list("name", flat=True).first() or ""
+    selected_sub_county_name = ""
+    if sub_county_id:
+        selected_sub_county_name = (
+            SubCounty.objects.filter(id=sub_county_id).values_list("name", flat=True).first() or ""
+        )
+    selected_area_name = ""
+    if area_id:
+        selected_area_name = CHPArea.objects.filter(id=area_id).values_list("name", flat=True).first() or ""
+
+    context = {
+        "no_data": not scope["periods"],
+        "periods": scope["periods"],
+        "period": scope["period"],
+        "period_display": scope["period_display_label"],
+        "period_presets": chp_period_presets(),
+        "selected_range": scope["range_key"] or "",
+        "filters": chp_filter_options(user, county_id=county_id, sub_county_id=sub_county_id, chu_id=chu_id),
+        "selected": {
+            "county": county_id or "",
+            "sub_county": sub_county_id or "",
+            "chu": chu_id or "",
+            "area": area_id or "",
+            "q": scope["search_query"],
+            "view": scope["view_param"] or "",
+        },
+        "selected_county_name": selected_county_name,
+        "selected_sub_county_name": selected_sub_county_name,
+        "selected_area_name": selected_area_name,
+        "moh748_preview": build_chp_moh748_preview(scope["records"], period_range=scope["period_range"]),
+    }
+    return render(request, "core/chp_moh748.html", context)
 
 
 def _chp_csv_response(filename, header, rows):
@@ -1393,7 +1610,7 @@ def _chp_csv_response(filename, header, rows):
 def export_chp_balances_csv(request):
     """CSV of Commodity Balances, same columns/order as the on-screen table."""
     scope = _chp_resolve_scope(request)
-    rows = build_chp_balance_summary(scope["records"])
+    rows = build_chp_balance_summary(scope["records"], period_range=scope["period_range"])
     header = [
         "Commodity",
         "Beginning Balance",
@@ -1417,7 +1634,7 @@ def export_chp_balances_csv(request):
         ]
         for row in rows
     ]
-    filename = f"chp-commodity-balances-{scope['period'] or 'all'}.csv"
+    filename = f"chp-commodity-balances-{scope['range_key'] or scope['period'] or 'all'}.csv"
     return _chp_csv_response(filename, header, data)
 
 
@@ -1425,7 +1642,7 @@ def export_chp_balances_csv(request):
 def export_chp_moh748_csv(request):
     """CSV of the Generated MOH 748 Preview — a preview export, same caveat as the on-screen card: not a real submission."""
     scope = _chp_resolve_scope(request)
-    rows = build_chp_moh748_preview(scope["records"])
+    rows = build_chp_moh748_preview(scope["records"], period_range=scope["period_range"])
     header = [
         "Drug Name",
         "Available from eCHIS",
@@ -1451,7 +1668,7 @@ def export_chp_moh748_csv(request):
         ]
         for row in rows
     ]
-    filename = f"generated-moh748-preview-{scope['period'] or 'all'}.csv"
+    filename = f"generated-moh748-preview-{scope['range_key'] or scope['period'] or 'all'}.csv"
     return _chp_csv_response(filename, header, data)
 
 
@@ -1462,7 +1679,7 @@ def export_chp_stock_status_csv(request):
     just whatever page the on-screen heatmap happens to be showing.
     """
     scope = _chp_resolve_scope(request)
-    rows = _build_chp_heatmap_rows(scope["records"])
+    rows = _build_chp_heatmap_rows(scope["latest_records"])
     commodities = list(CHPCommodity)
     header = ["CHP", "County", "Sub-County", "Community Health Unit", "Last Received"] + [
         c.label for c in commodities

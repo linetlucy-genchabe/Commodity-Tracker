@@ -10,7 +10,7 @@
 <body>
 {% if user.is_authenticated %}
 <div class="app-header">
-  <a href="{% url 'home' %}" class="brand" style="text-decoration:none; color:inherit;">
+  <a href="{% url 'chp_moh748' %}" class="brand" style="text-decoration:none; color:inherit;">
     <div class="brand-mark">CT</div>
     <div>
       <div class="brand-name">Commodity Tracker</div>
@@ -19,7 +19,7 @@
   </a>
   <div style="display:flex; align-items:center; gap:14px;">
     <div class="form-switch">
-      <a href="{% url 'home' %}" style="--tab-accent:var(--sky);" class="{% if request.resolver_match.url_name == 'home' or request.resolver_match.url_name == 'facility_drilldown' %}active{% endif %}">
+      <a href="{% url 'chp_moh748' %}" style="--tab-accent:var(--sky);" class="{% if request.resolver_match.url_name == 'chp_moh748' %}active{% endif %}">
         <span class="tab-dot" style="background:var(--sky);"></span>MOH 748
       </a>
       <a href="{% url 'chp_home' %}" style="--tab-accent:var(--teal);" class="{% if request.resolver_match.url_name == 'chp_home' %}active{% endif %}">
@@ -36,6 +36,10 @@
         <svg class="user-menu-chevron" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
       </summary>
       <div class="user-menu-dropdown">
+        <a href="{% url 'home' %}" class="user-menu-item">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"/><path d="M14 2v6h6"/><path d="M9 13h6M9 17h6"/></svg>
+          Uploaded MOH 748 Records
+        </a>
         {% if user.may_upload %}
         <a href="{% url 'upload' %}" class="user-menu-item">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M17 8l-5-5-5 5"/><path d="M12 3v12"/></svg>

@@ -1,0 +1,204 @@
+{% extends "base.html" %}
+{% load static %}
+{% block title %}MOH 748 — Commodity Tracker{% endblock %}
+{% block content %}
+
+<div class="dash-layout">
+
+  <form class="filter-sidebar" id="moh748FilterForm" method="get">
+    <input type="hidden" name="view" value="{{ selected.view }}">
+    <div class="sidebar-heading">Filters</div>
+
+    <div class="filter-group">
+      <label for="moh748_period">Period</label>
+      <select name="period" id="moh748_period" onchange="this.form.submit()">
+        {% for p in periods %}
+          <option value="{{ p }}" {% if p == period and not selected_range %}selected{% endif %}>{{ p }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="filter-group">
+      <label>Quick Range</label>
+      <div class="preset-chip-row">
+        {% for preset in period_presets %}
+          <a
+            href="?{% if preset.kind == 'single' %}period={{ preset.period }}{% else %}range={{ preset.key }}{% endif %}&county={{ selected.county }}&sub_county={{ selected.sub_county }}&chu={{ selected.chu }}&area={{ selected.area }}&view={{ selected.view }}{% if selected.q %}&q={{ selected.q|urlencode }}{% endif %}"
+            class="preset-chip{% if preset.kind == 'single' and not selected_range and preset.period == period %} active{% endif %}{% if preset.kind == 'range' and selected_range == preset.key %} active{% endif %}"
+          >
+            <span class="preset-chip-label">{{ preset.label }}</span>
+            <span class="preset-chip-sub">{{ preset.display }}</span>
+          </a>
+        {% endfor %}
+      </div>
+    </div>
+    <div class="filter-group">
+      <label for="moh748_county">County</label>
+      <select name="county" id="moh748_county" onchange="this.form.submit()" class="{% if selected.county %}filter-active{% endif %}">
+        <option value="">All counties</option>
+        {% for c in filters.counties %}
+          <option value="{{ c.id }}" {% if selected.county == c.id|stringformat:"s" %}selected{% endif %}>{{ c.name }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="filter-group">
+      <label for="moh748_sub_county">Sub-County</label>
+      <select name="sub_county" id="moh748_sub_county" onchange="this.form.submit()" class="{% if selected.sub_county %}filter-active{% endif %}">
+        <option value="">All sub-counties</option>
+        {% for s in filters.sub_counties %}
+          <option value="{{ s.id }}" {% if selected.sub_county == s.id|stringformat:"s" %}selected{% endif %}>{{ s.name }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="filter-group">
+      <label for="moh748_chu">Community Health Unit</label>
+      <select name="chu" id="moh748_chu" onchange="this.form.submit()" class="{% if selected.chu %}filter-active{% endif %}">
+        <option value="">All CHUs</option>
+        {% for u in filters.chus %}
+          <option value="{{ u.id }}" {% if selected.chu == u.id|stringformat:"s" %}selected{% endif %}>{{ u.name }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="filter-group">
+      <label for="moh748_area">CHP</label>
+      <select name="area" id="moh748_area" onchange="this.form.submit()" class="{% if selected.area %}filter-active{% endif %}">
+        <option value="">All CHPs</option>
+        {% for a in filters.areas %}
+          <option value="{{ a.id }}" {% if selected.area == a.id|stringformat:"s" %}selected{% endif %}>{{ a.name|default:"Unresolved CHP" }}</option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <div class="sidebar-actions">
+      <a href="{% url 'chp_moh748' %}" class="btn btn-outline" style="width:100%; text-align:center; display:block;">Reset filters</a>
+    </div>
+
+    <div class="sidebar-legend">
+      <div class="sidebar-heading">Source</div>
+      <div style="font-size:11.5px; color:var(--ink-soft); line-height:1.5;">Generated from eCHIS backend data &mdash; not an uploaded facility submission. Narrows as you filter down to a county, sub-county, CHU or CHP.</div>
+    </div>
+  </form>
+
+<div class="dash-main">
+
+{% if no_data %}
+  <div class="card empty-note">
+    No eCHIS backend data has been uploaded yet.
+    {% if can_upload %}<a href="{% url 'chp_upload' %}">Upload the first month's eCHIS export</a> to get started.{% endif %}
+  </div>
+{% else %}
+
+  {% if selected_area_name %}
+    <div class="card-title" style="font-size:22px; margin-bottom:-4px;">{{ selected_area_name }}</div>
+  {% elif selected_sub_county_name %}
+    <div class="card-title" style="font-size:22px; margin-bottom:-4px;">{{ selected_sub_county_name }}</div>
+  {% elif selected_county_name %}
+    <div class="card-title" style="font-size:22px; margin-bottom:-4px;">{{ selected_county_name }} County</div>
+  {% endif %}
+
+  <div class="card">
+    <div style="display:flex; align-items:center; justify-content:space-between; gap:8px; flex-wrap:wrap;">
+      <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+        <div class="card-title" style="margin:0;">Generated MOH 748</div>
+        <span class="pill" style="background:var(--amber-bg); color:#4A3405; font-weight:700;">GENERATED &middot; not an uploaded submission</span>
+      </div>
+      <a href="{% url 'chp_export_moh748' %}?{{ request.GET.urlencode }}" class="btn-download"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/></svg>Download CSV</a>
+    </div>
+    <div class="card-sub">What the MOH 748 looks like generated from eCHIS backend data for the scope selected on the left &middot; {{ period_display }}. Not written to any facility's real 748 record.</div>
+    <div style="overflow-x:auto; margin-top:12px;">
+      <table class="heatmap">
+        <thead>
+          <tr>
+            <th>Drug Name</th>
+            <th style="text-align:right;">A. Begin. Balance</th>
+            <th style="text-align:right;">B. Received</th>
+            <th style="text-align:right;">
+              C. Dispensed
+              <span class="def-tip">&#9432;<span class="bubble">Excludes rows eCHIS itself flagged as an implausible dispensed quantity &mdash; those rows' other fields are kept.</span></span>
+            </th>
+            <th style="text-align:right;">
+              D. Losses (Excl. Expiries)
+              <span class="def-tip">&#9432;<span class="bubble">Not present in eCHIS's export at this reporting grain &mdash; eCHIS records stock amendments/discrepancies as separate events, not a direct Losses field. Always blank here.</span></span>
+            </th>
+            <th style="text-align:right;">E. Balance / Physical Count</th>
+            <th style="text-align:center;">
+              F. Est. Days Out of Stock
+              <span class="def-tip">&#9432;<span class="bubble">Estimated from eCHIS's Stockout/Low stock/Adequate status, not a measured day count. Adequate &rarr; 0, Low stock &rarr; the draft amber threshold, Stockout &rarr; the whole reporting month.</span></span>
+            </th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in moh748_preview %}
+          <tr>
+            <td style="font-weight:600;">
+              <span class="row-identity">
+                <span class="commodity-chip" style="background:{{ row.color }}1F;"><span class="dot" style="background:{{ row.color }};"></span></span>
+                {{ row.commodity_label }}
+              </span>
+            </td>
+            {% if row.available %}
+              <td style="text-align:right;" class="mono{% if row.beginning_balance == None %} mono-faint{% endif %}">{{ row.beginning_balance|default_if_none:"&middot;" }}</td>
+              <td style="text-align:right;" class="mono{% if row.quantity_received == None %} mono-faint{% endif %}">{{ row.quantity_received|default_if_none:"&middot;" }}</td>
+              <td style="text-align:right;" class="mono{% if row.total_dispensed == None %} mono-faint{% endif %}">{{ row.total_dispensed|default_if_none:"&middot;" }}{% if row.flagged_rows_excluded %} <span class="row-sublabel" style="display:inline;" title="{{ row.flagged_rows_excluded }} row(s) excluded &mdash; flagged by eCHIS as an implausible quantity">({{ row.flagged_rows_excluded }} excluded)</span>{% endif %}</td>
+              <td style="text-align:right;" class="mono mono-faint" title="Not available from eCHIS">&middot;</td>
+              <td style="text-align:right;" class="mono{% if row.physical_count == None %} mono-faint{% endif %}">{{ row.physical_count|default_if_none:"&middot;" }}</td>
+              <td style="text-align:center;">
+                {% if row.estimated_days_out_of_stock == None %}<span class="mono mono-faint">&middot;</span>
+                {% elif row.estimated_days_out_of_stock == 0 %}<span class="pill GREEN">{{ row.estimated_days_out_of_stock }}</span>
+                {% elif row.estimated_days_out_of_stock < 7 %}<span class="pill AMBER">{{ row.estimated_days_out_of_stock }}</span>
+                {% else %}<span class="pill RED">{{ row.estimated_days_out_of_stock }}</span>{% endif %}
+              </td>
+            {% else %}
+              <td colspan="6" style="text-align:center; color:var(--ink-faint); font-style:italic;">Not available from eCHIS</td>
+            {% endif %}
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <div class="card-sub" style="margin-top:20px; font-weight:600; color:var(--ink-soft);">Summary for Weight Band / Age Category</div>
+    <div style="overflow-x:auto; margin-top:8px;">
+      <table class="heatmap">
+        <thead>
+          <tr>
+            <th>Drug Name</th>
+            <th style="text-align:center;">5 to &lt;15kg<br>&lt;3yrs</th>
+            <th style="text-align:center;">15 to &lt;25kg<br>3-8yrs</th>
+            <th style="text-align:center;">25 to &lt;35kg<br>8-12yrs</th>
+            <th style="text-align:center;">&ge;35kg<br>&ge;12yrs</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td colspan="5" style="text-align:center; color:var(--ink-faint); font-style:italic;">Not available from eCHIS &mdash; this breakdown isn't part of the eCHIS backend data</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="card-sub" style="margin-top:20px; font-weight:600; color:var(--ink-soft);">Suspected Cases</div>
+    <div style="overflow-x:auto; margin-top:8px;">
+      <table class="heatmap">
+        <thead>
+          <tr>
+            <th></th>
+            <th style="text-align:center;">&lt;5 Yrs</th>
+            <th style="text-align:center;">&ge;5 Yrs</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td>No. Positive</td><td colspan="2" class="mono mono-faint" style="text-align:center;">Not available from eCHIS</td></tr>
+          <tr><td>No. Negative</td><td colspan="2" class="mono mono-faint" style="text-align:center;">Not available from eCHIS</td></tr>
+          <tr><td>No. Not Tested</td><td colspan="2" class="mono mono-faint" style="text-align:center;">Not available from eCHIS</td></tr>
+          <tr><td>No. Invalid</td><td colspan="2" class="mono mono-faint" style="text-align:center;">Not available from eCHIS</td></tr>
+          <tr><td style="font-weight:600;">Total</td><td colspan="2" class="mono mono-faint" style="text-align:center;">Not available from eCHIS</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+{% endif %}
+</div>
+
+</div>
+{% endblock %}

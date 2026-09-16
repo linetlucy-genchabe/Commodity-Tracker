@@ -158,6 +158,23 @@ a:hover{color:var(--navy); text-decoration:underline;}
 .filter-sidebar .sidebar-legend{margin-top:auto; padding-top:16px; border-top:1px solid rgba(255,255,255,.16);}
 .filter-sidebar .btn-outline{background:transparent; color:#fff; border:1.5px solid rgba(255,255,255,.5);}
 .filter-sidebar .btn-outline:hover{background:rgba(255,255,255,.08);}
+/* Quick-range period presets (Current Month / Last Month / Last 2 Months /
+   Last Full Quarter) — a row of stacked chips in the filter sidebar, each
+   showing the preset's resolved calendar label underneath its name so it's
+   clear what "Last 2 Months" actually means right now without opening the
+   period dropdown. */
+.preset-chip-row{display:flex; flex-direction:column; gap:6px;}
+.preset-chip{
+  display:flex; flex-direction:column; gap:1px; padding:7px 10px; border-radius:8px;
+  border:1px solid rgba(255,255,255,.22); background:rgba(255,255,255,.06);
+  text-decoration:none !important; cursor:pointer;
+}
+.preset-chip:hover{background:rgba(255,255,255,.12); border-color:rgba(255,255,255,.4);}
+.preset-chip.active{background:#fff; border-color:#fff;}
+.preset-chip-label{font-size:11.5px; font-weight:700; color:#fff;}
+.preset-chip.active .preset-chip-label{color:var(--navy);}
+.preset-chip-sub{font-size:10px; font-weight:600; color:rgba(255,255,255,.65);}
+.preset-chip.active .preset-chip-sub{color:var(--navy2);}
 .sidebar-heading{font-size:10.5px; font-weight:700; color:var(--ink-soft); text-transform:uppercase; letter-spacing:.5px;}
 .sidebar-actions{border-top:1px solid var(--line); padding-top:14px; margin-top:2px;}
 .sidebar-legend{margin-top:auto; padding-top:16px; border-top:1px solid var(--line);}
