@@ -14,7 +14,7 @@
       <select name="period" id="chp_period" onchange="this.form.submit()">
         <optgroup label="Quick Range">
           {% for preset in period_presets %}
-            <option value="range:{{ preset.key }}" {% if selected_range == preset.key or selected_single_preset == preset.key %}selected{% endif %}>{{ preset.label }} &mdash; {{ preset.display }}</option>
+            <option value="range:{{ preset.key }}" {% if selected_range == preset.key or selected_single_preset == preset.key %}selected{% endif %}>{{ preset.label }}</option>
           {% endfor %}
         </optgroup>
         <optgroup label="All Periods">
@@ -23,6 +23,7 @@
           {% endfor %}
         </optgroup>
       </select>
+      <div class="period-resolved-hint">Showing: {{ period_display }}</div>
     </div>
     <div class="filter-group">
       <label for="chp_county">County</label>
