@@ -10,4 +10,7 @@ urlpatterns = [
     path("chp/", views.chp_commodity_home, name="chp_home"),
     path("chp/upload/", views.upload_chp_commodity, name="chp_upload"),
     path("chp/upload/<int:upload_id>/delete/", views.delete_chp_commodity_upload, name="delete_chp_upload"),
+    path("chp/export/balances.csv", views.export_chp_balances_csv, name="chp_export_balances"),
+    path("chp/export/moh748.csv", views.export_chp_moh748_csv, name="chp_export_moh748"),
+    path("chp/export/stock-status.csv", views.export_chp_stock_status_csv, name="chp_export_stock_status"),
 ]

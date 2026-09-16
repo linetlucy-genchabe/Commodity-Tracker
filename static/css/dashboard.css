@@ -7,6 +7,7 @@
   --green:#3F9A56;   --green-bg:#EAF6ED;
   --amber:#D9A544;   --amber-bg:#FBF3DE;
   --red:#E5574B;     --red-bg:#FDEDEB;
+  --red-light:#B9564A; --red-light-bg:#FFF1EE; --red-light-icon:#FBDCD6;
   --teal:#1F9E93;    --teal-bg:#E6F6F4;
   --pink:#D64C8C;    --pink-bg:#FBEAF2;
   --sky-bg:#E5F1FE;
@@ -114,6 +115,12 @@ a:hover{color:var(--navy); text-decoration:underline;}
 }
 .btn-primary{background:var(--orange); color:#fff;}
 .btn-outline{background:#fff; color:var(--navy); border:1.5px solid var(--navy);}
+.btn-download{
+  font-size:11.5px; font-weight:700; padding:6px 12px; border-radius:8px;
+  border:1.5px solid var(--line); background:#fff; color:var(--ink-soft);
+  display:inline-flex; align-items:center; gap:5px; text-decoration:none; cursor:pointer; white-space:nowrap;
+}
+.btn-download:hover{border-color:var(--navy); color:var(--navy);}
 
 /* dashboard: left filter sidebar + main content, side by side */
 .dash-layout{display:flex; align-items:flex-start;}
@@ -171,6 +178,12 @@ a:hover{color:var(--navy); text-decoration:underline;}
 
 .kpi-row{display:grid; grid-template-columns:repeat(4,1fr); gap:12px;}
 @media (max-width: 1000px){ .kpi-row{grid-template-columns:repeat(2,1fr);} }
+/* Five-card variant for the CHP dashboard: Reporting + the four
+   weeks-of-stock bands (Adequate/Moderate/Stockout or Low Stock/
+   Overstocked). Used alongside .kpi-row, not instead of it. */
+.kpi-row-5{grid-template-columns:repeat(5,1fr);}
+@media (max-width: 1200px){ .kpi-row-5{grid-template-columns:repeat(3,1fr);} }
+@media (max-width: 700px){ .kpi-row-5{grid-template-columns:repeat(2,1fr);} }
 .kpi-card{
   /* Full tinted background per card, matching its icon/value color,
      instead of four identical white boxes — the other half of the
@@ -185,6 +198,10 @@ a:hover{color:var(--navy); text-decoration:underline;}
 .kpi-card.expiry{background:var(--purple-bg); box-shadow:0 1px 2px rgba(15,32,55,.05), 0 8px 20px -12px rgba(108,79,158,.24);}
 .kpi-card.expiry-ok{background:var(--green-bg); box-shadow:0 1px 2px rgba(15,32,55,.05), 0 8px 20px -12px rgba(63,154,86,.24);}
 .kpi-card.weeks{background:var(--teal-bg); box-shadow:0 1px 2px rgba(15,32,55,.05), 0 8px 20px -12px rgba(31,158,147,.24);}
+/* Overstocked gets its own lighter, dustier red -- distinct from the
+   stronger "stockout" red on purpose, so a dangerously-low CHP and an
+   overstocked one never read as the same alarm. */
+.kpi-card.overstocked{background:var(--red-light-bg); box-shadow:0 1px 2px rgba(15,32,55,.05), 0 8px 20px -12px rgba(185,86,74,.20);}
 .kpi-head{display:flex; align-items:center; justify-content:space-between; gap:9px; margin-bottom:10px;}
 .kpi-head-left{display:flex; align-items:center; gap:9px; min-width:0;}
 .kpi-delta{font-size:11.5px; font-weight:700; text-align:right; white-space:nowrap;}
@@ -199,6 +216,7 @@ a:hover{color:var(--navy); text-decoration:underline;}
 .kpi-icon.expiry{background:var(--purple-bg);}
 .kpi-icon.expiry-ok{background:var(--green-bg);}
 .kpi-icon.weeks{background:var(--teal-bg);}
+.kpi-icon.overstocked{background:var(--red-light-icon);}
 .kpi-label{font-size:11px; font-weight:700; color:var(--ink-soft); text-transform:uppercase; letter-spacing:.5px;}
 .kpi-value{font-size:32px; font-weight:800; font-family:'IBM Plex Mono', monospace; line-height:1;}
 .kpi-value.stockout{color:var(--red);}
@@ -207,6 +225,7 @@ a:hover{color:var(--navy); text-decoration:underline;}
 .kpi-value.expiry-ok{color:var(--green);}
 .kpi-value.weeks{color:#0F5F58;}
 .kpi-value.reporting{color:var(--navy);}
+.kpi-value.overstocked{color:var(--red-light);}
 .kpi-sub{font-size:12px; color:var(--ink-soft); margin-top:7px;}
 .kpi-sub-ok{color:#1F5C2E; font-weight:600;}
 
@@ -324,6 +343,7 @@ table.heatmap tr.row-warn{background:#FDF6F5; box-shadow:inset 3px 0 0 rgba(229,
 .pill.GREEN{background:var(--green-bg); color:#1F5C2E;}
 .pill.AMBER{background:var(--amber); color:#4A3405;}
 .pill.RED{background:var(--red); color:#fff;}
+.pill.RED_LIGHT{background:var(--red-light-icon); color:#7A3B31;}
 .pill.PURPLE{background:var(--purple-bg); color:var(--purple);}
 .pill.TEAL{background:var(--teal-bg); color:#0F5F58;}
 

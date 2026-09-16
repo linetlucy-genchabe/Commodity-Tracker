@@ -5,6 +5,7 @@ README "Project layout".
 """
 
 import calendar
+import csv
 import json
 
 from django import forms
@@ -13,6 +14,7 @@ from django.contrib.auth.decorators import login_required, user_passes_test
 from django.core.paginator import Paginator
 from django.core.serializers.json import DjangoJSONEncoder
 from django.db.models import Avg, Count, Max, Sum
+from django.http import HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 
 from .models import (
@@ -544,11 +546,13 @@ def chp_filter_options(user, *, county_id=None, sub_county_id=None, chu_id=None)
 def weeks_of_stock_severity(weeks):
     """
     Lynne's 4-band read on an average weeks-of-stock figure, used wherever
-    a weeks-of-stock number gets a colored pill on the CHP dashboard: both
-    ends are flagged red (under 2 weeks is stockout/low stock, over 6 weeks
-    is overstocked), and only the middle two bands -- 2-4 weeks (amber),
-    4-6 weeks (green) -- read as a healthy supply position. Replaces the
-    earlier, coarser 3-band version (<1 red / <=2 amber / else green).
+    a weeks-of-stock number gets a colored pill on the CHP dashboard: under
+    2 weeks is stockout/low stock (RED), 2-4 weeks is moderate (AMBER), 4-6
+    weeks is adequate (GREEN), and over 6 weeks is overstocked -- also red,
+    per Lynne's request, but its own lighter shade (RED_LIGHT) so a
+    dangerously-low CHP and an overstocked one never look identical at a
+    glance. Replaces the earlier, coarser 3-band version (<1 red / <=2
+    amber / else green), which itself replaced a 2-band original.
     """
     if weeks is None:
         return None
@@ -559,7 +563,38 @@ def weeks_of_stock_severity(weeks):
         return "AMBER"
     if weeks <= 6:
         return "GREEN"
-    return "RED"
+    return "RED_LIGHT"
+
+
+def chp_weeks_bands(records_qs):
+    """
+    One weeks-of-stock band per CHP -- its own average across whatever
+    commodities it has in scope (same average the Avg. Weeks of Stock
+    figure already used), so a CHP lands in exactly one band rather than
+    being counted once per commodity. Powers the four top-of-page status
+    cards Lynne asked for: Adequate (4-6 wks) / Moderate (2-4 wks) /
+    Stockout or Low Stock (0-2 wks) / Overstocked (6+ wks) -- same
+    boundaries and colors as weeks_of_stock_severity() everywhere else on
+    this dashboard, just counted per CHP instead of rendered as one pill.
+    A CHP with no weeks-of-stock data anywhere in scope isn't in any band.
+    """
+    per_area = (
+        records_qs.exclude(weeks_of_stock__isnull=True)
+        .values("chp_area_id")
+        .annotate(avg_weeks=Avg("weeks_of_stock"))
+    )
+    bands = {"GREEN": 0, "AMBER": 0, "RED": 0, "RED_LIGHT": 0}
+    for row in per_area:
+        band = weeks_of_stock_severity(row["avg_weeks"])
+        if band:
+            bands[band] += 1
+    return {
+        "adequate": bands["GREEN"],
+        "moderate": bands["AMBER"],
+        "stockout_low": bands["RED"],
+        "overstocked": bands["RED_LIGHT"],
+        "reporting_with_weeks": len(per_area),
+    }
 
 
 def build_chp_kpis(records_qs, areas_qs):
@@ -616,6 +651,7 @@ def build_chp_kpis(records_qs, areas_qs):
         "avg_weeks_overstocked": avg_weeks is not None and avg_weeks > 6,
         "unresolved_areas": unresolved_areas,
         "severity": severity,
+        "weeks_bands": chp_weeks_bands(records_qs),
     }
 
 
@@ -636,18 +672,17 @@ def chp_last_received_by_area(area_ids):
     return {row["chp_area_id"]: row["last_received_period"] for row in rows}
 
 
-def build_chp_heatmap(records_qs, *, page_number=1):
+def _build_chp_heatmap_rows(records_qs):
     """
-    CHP-area-level heatmap, one row per area with a record in records_qs —
-    same "never hide a row on a guess" rule as MOH 748's build_heatmap().
-    Cells are colored using the stock status eCHIS already computed
-    (Stockout/Low stock/Adequate) rather than a threshold Lynne would set
-    herself, but the cell TEXT is the actual stock-on-hand balance (not
-    just the status word) — same "show the real number, not just plastic
-    coloring" pattern MOH 748's own Facility Stock Status heatmap uses.
+    The full, unpaginated row list behind build_chp_heatmap() — same rows,
+    same worst-first sort, just without slicing to one page. Split out so
+    the CHP Stock Status CSV export can write every CHP in scope, not just
+    whatever page happens to be on screen.
     """
     area_ids = list(records_qs.values_list("chp_area_id", flat=True).distinct())
-    areas = list(CHPArea.objects.filter(id__in=area_ids).select_related("community_health_unit__sub_county__county"))
+    areas = list(
+        CHPArea.objects.filter(id__in=area_ids).select_related("community_health_unit__sub_county__county", "county")
+    )
 
     by_area_commodity = {(r.chp_area_id, r.commodity): r for r in records_qs}
     last_received_by_area = chp_last_received_by_area(area_ids)
@@ -687,7 +722,20 @@ def build_chp_heatmap(records_qs, *, page_number=1):
     rows.sort(key=lambda r: (-r["_severity"], (r["area"].name or r["area"].external_id)))
     for row in rows:
         del row["_severity"]
+    return rows
 
+
+def build_chp_heatmap(records_qs, *, page_number=1):
+    """
+    CHP-area-level heatmap, one row per area with a record in records_qs —
+    same "never hide a row on a guess" rule as MOH 748's build_heatmap().
+    Cells are colored using the stock status eCHIS already computed
+    (Stockout/Low stock/Adequate) rather than a threshold Lynne would set
+    herself, but the cell TEXT is the actual stock-on-hand balance (not
+    just the status word) — same "show the real number, not just plastic
+    coloring" pattern MOH 748's own Facility Stock Status heatmap uses.
+    """
+    rows = _build_chp_heatmap_rows(records_qs)
     paginator = Paginator(rows, PAGE_SIZE)
     page_obj = paginator.get_page(page_number)
 
@@ -1192,7 +1240,13 @@ def facility_drilldown(request, facility_id):
 
 
 @login_required
-def chp_commodity_home(request):
+def _chp_resolve_scope(request):
+    """
+    GET-param resolution shared by the CHP dashboard and its three CSV
+    downloads (Balances / Generated 748 / CHP Stock Status), so a download
+    always reflects exactly the period + geography filters on screen —
+    never the whole table regardless of what's selected.
+    """
     user = request.user
     areas = chp_scoped_areas(user)
 
@@ -1215,6 +1269,35 @@ def chp_commodity_home(request):
     records = CHPCommodityRecord.objects.filter(period=period, chp_area__in=filtered_areas).select_related(
         "chp_area__community_health_unit__sub_county__county"
     )
+
+    return {
+        "user": user,
+        "periods": periods,
+        "period": period,
+        "county_id": county_id,
+        "sub_county_id": sub_county_id,
+        "chu_id": chu_id,
+        "area_id": area_id,
+        "search_query": search_query,
+        "view_param": view_param,
+        "filtered_areas": filtered_areas,
+        "records": records,
+    }
+
+
+def chp_commodity_home(request):
+    scope = _chp_resolve_scope(request)
+    user = scope["user"]
+    periods = scope["periods"]
+    period = scope["period"]
+    county_id = scope["county_id"]
+    sub_county_id = scope["sub_county_id"]
+    chu_id = scope["chu_id"]
+    area_id = scope["area_id"]
+    search_query = scope["search_query"]
+    view_param = scope["view_param"]
+    filtered_areas = scope["filtered_areas"]
+    records = scope["records"]
 
     # Same drill-down shape as the MOH 748 dashboard: land on a county
     # summary, then sub-county, then a "choose CHUs or CHP areas" screen
@@ -1248,6 +1331,12 @@ def chp_commodity_home(request):
         selected_sub_county_name = (
             SubCounty.objects.filter(id=sub_county_id).values_list("name", flat=True).first() or ""
         )
+    # Shown as a page heading once someone has drilled down to one specific
+    # CHP, so that screen reads as "you're looking at Grace Akinyi Olonde
+    # Area" rather than a generic "CHP Area" table with one row in it.
+    selected_area_name = ""
+    if area_id:
+        selected_area_name = CHPArea.objects.filter(id=area_id).values_list("name", flat=True).first() or ""
 
     context = {
         "no_data": not periods,
@@ -1268,6 +1357,7 @@ def chp_commodity_home(request):
         "can_upload": user.may_upload,
         "selected_county_name": selected_county_name,
         "selected_sub_county_name": selected_sub_county_name,
+        "selected_area_name": selected_area_name,
     }
 
     if level == "area":
@@ -1288,6 +1378,116 @@ def chp_commodity_home(request):
     context["moh748_preview"] = build_chp_moh748_preview(records)
 
     return render(request, "core/chp_home.html", context)
+
+
+def _chp_csv_response(filename, header, rows):
+    response = HttpResponse(content_type="text/csv")
+    response["Content-Disposition"] = f'attachment; filename="{filename}"'
+    writer = csv.writer(response)
+    writer.writerow(header)
+    writer.writerows(rows)
+    return response
+
+
+@login_required
+def export_chp_balances_csv(request):
+    """CSV of Commodity Balances, same columns/order as the on-screen table."""
+    scope = _chp_resolve_scope(request)
+    rows = build_chp_balance_summary(scope["records"])
+    header = [
+        "Commodity",
+        "Beginning Balance",
+        "Received",
+        "Stock in Hand",
+        "Dispensed",
+        "Ending Balance",
+        "Avg Weeks of Stock",
+        "Flagged Rows Excluded (Dispensed)",
+    ]
+    data = [
+        [
+            row["commodity"].label,
+            row["beginning_balance"],
+            row["quantity_received"],
+            row["stock_on_hand"],
+            row["quantity_dispensed"],
+            row["ending_balance"],
+            row["avg_weeks_of_stock"],
+            row["flagged_rows_excluded"],
+        ]
+        for row in rows
+    ]
+    filename = f"chp-commodity-balances-{scope['period'] or 'all'}.csv"
+    return _chp_csv_response(filename, header, data)
+
+
+@login_required
+def export_chp_moh748_csv(request):
+    """CSV of the Generated MOH 748 Preview — a preview export, same caveat as the on-screen card: not a real submission."""
+    scope = _chp_resolve_scope(request)
+    rows = build_chp_moh748_preview(scope["records"])
+    header = [
+        "Drug Name",
+        "Available from eCHIS",
+        "A. Beginning Balance",
+        "B. Quantity Received",
+        "C. Total Dispensed",
+        "D. Losses (Excl. Expiries)",
+        "E. Balance / Physical Count",
+        "F. Est. Days Out of Stock",
+        "Flagged Rows Excluded (Dispensed)",
+    ]
+    data = [
+        [
+            row["commodity_label"],
+            "Yes" if row["available"] else "No",
+            row["beginning_balance"],
+            row["quantity_received"],
+            row["total_dispensed"],
+            row["losses_excl_expiries"],
+            row["physical_count"],
+            row["estimated_days_out_of_stock"],
+            row["flagged_rows_excluded"],
+        ]
+        for row in rows
+    ]
+    filename = f"generated-moh748-preview-{scope['period'] or 'all'}.csv"
+    return _chp_csv_response(filename, header, data)
+
+
+@login_required
+def export_chp_stock_status_csv(request):
+    """
+    CSV of CHP Stock Status — every CHP in the current filter scope, not
+    just whatever page the on-screen heatmap happens to be showing.
+    """
+    scope = _chp_resolve_scope(request)
+    rows = _build_chp_heatmap_rows(scope["records"])
+    commodities = list(CHPCommodity)
+    header = ["CHP", "County", "Sub-County", "Community Health Unit", "Last Received"] + [
+        c.label for c in commodities
+    ]
+    data = []
+    for row in rows:
+        area = row["area"]
+        chu = area.community_health_unit
+        line = [
+            area.name or area.external_id,
+            area.county.name if area.county_id else "",
+            chu.sub_county.name if chu else "",
+            chu.name if chu else "",
+            row["last_received_display"] or "",
+        ]
+        for cell in row["cells"]:
+            if cell is None:
+                line.append("")
+            elif cell["stock_on_hand"] is not None:
+                line.append(f'{cell["stock_on_hand"]} ({cell["full_label"]})')
+            else:
+                line.append(cell["full_label"])
+        data.append(line)
+    filename = f"chp-stock-status-{scope['period'] or 'all'}.csv"
+    return _chp_csv_response(filename, header, data)
 
 
 def _can_upload(user):

@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% load static %}
-{% block title %}CHP Commodity Stock Flow — Commodity Tracker{% endblock %}
+{% block title %}eCHIS Backend Data — Commodity Tracker{% endblock %}
 {% block content %}
 
 <div class="dash-layout">
@@ -45,11 +45,11 @@
       </select>
     </div>
     <div class="filter-group">
-      <label for="chp_area">CHP Area</label>
+      <label for="chp_area">CHP</label>
       <select name="area" id="chp_area" onchange="this.form.submit()" class="{% if selected.area %}filter-active{% endif %}">
-        <option value="">All CHP areas</option>
+        <option value="">All CHPs</option>
         {% for a in filters.areas %}
-          <option value="{{ a.id }}" {% if selected.area == a.id|stringformat:"s" %}selected{% endif %}>{{ a.name|default:"Unresolved area" }}</option>
+          <option value="{{ a.id }}" {% if selected.area == a.id|stringformat:"s" %}selected{% endif %}>{{ a.name|default:"Unresolved CHP" }}</option>
         {% endfor %}
       </select>
     </div>
@@ -74,57 +74,74 @@
 
 {% if no_data %}
   <div class="card empty-note">
-    No CHP Commodity Stock Flow data has been uploaded yet.
+    No eCHIS backend data has been uploaded yet.
     {% if can_upload %}<a href="{% url 'chp_upload' %}">Upload the first month's eCHIS export</a> to get started.{% endif %}
   </div>
 {% else %}
 
-  <div class="kpi-row">
+  {% if selected_area_name %}
+    <div class="card-title" style="font-size:22px; margin-bottom:-4px;">{{ selected_area_name }}</div>
+  {% endif %}
+
+  <div class="kpi-row kpi-row-5">
     <div class="kpi-card">
       <div class="kpi-head">
         <div class="kpi-head-left">
           <div class="kpi-icon reporting"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#002D63" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></div>
-          <div class="kpi-label">CHP Areas Reporting</div>
+          <div class="kpi-label">CHPs Reporting</div>
         </div>
       </div>
       <div class="kpi-value reporting">{{ kpis.reporting }} <span style="font-size:16px; color:var(--ink-soft); font-weight:600;">/ {{ kpis.total_in_scope }}</span></div>
       <div class="kpi-sub">{{ period_display }}{% if kpis.unresolved_areas > 0 %} &middot; <span style="color:var(--purple); font-weight:700;">{{ kpis.unresolved_areas }} unresolved</span>{% endif %}</div>
     </div>
-    <div class="kpi-card stockout">
+    <div class="kpi-card expiry-ok">
       <div class="kpi-head">
         <div class="kpi-head-left">
-          <div class="kpi-icon stockout"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#E5574B" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 9v4M12 17h.01M10.3 3.9 2 18a2 2 0 0 0 1.7 3h16.6a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z"/></svg></div>
-          <div class="kpi-label">Areas with a Stockout</div>
+          <div class="kpi-icon expiry-ok"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#1F5C2E" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></div>
+          <div class="kpi-label">Adequate Stock</div>
         </div>
       </div>
-      <div class="kpi-value stockout">{{ kpis.with_stockout }} <span style="font-size:16px; color:var(--ink-soft); font-weight:600;">areas</span></div>
-      <div class="kpi-sub">{{ kpis.with_stockout_pct }}% of reporting areas</div>
+      <div class="kpi-value expiry-ok">{{ kpis.weeks_bands.adequate }} <span style="font-size:16px; color:var(--ink-soft); font-weight:600;">CHPs</span></div>
+      <div class="kpi-sub">4&ndash;6 weeks of stock &middot; {{ period_display }}</div>
     </div>
     <div class="kpi-card days">
       <div class="kpi-head">
         <div class="kpi-head-left">
           <div class="kpi-icon days"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#B9860F" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.5 2"/></svg></div>
-          <div class="kpi-label">Areas with Low Stock</div>
+          <div class="kpi-label">Moderate Stock</div>
         </div>
       </div>
-      <div class="kpi-value days">{{ kpis.with_low_stock }} <span style="font-size:16px; color:var(--ink-soft); font-weight:600;">areas</span></div>
-      <div class="kpi-sub">{{ period_display }}</div>
+      <div class="kpi-value days">{{ kpis.weeks_bands.moderate }} <span style="font-size:16px; color:var(--ink-soft); font-weight:600;">CHPs</span></div>
+      <div class="kpi-sub">2&ndash;4 weeks of stock &middot; {{ period_display }}</div>
     </div>
-    <div class="kpi-card weeks">
+    <div class="kpi-card stockout">
       <div class="kpi-head">
         <div class="kpi-head-left">
-          <div class="kpi-icon weeks"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#1F9E93" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/></svg></div>
-          <div class="kpi-label">Avg. Weeks of Stock</div>
+          <div class="kpi-icon stockout"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#E5574B" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 9v4M12 17h.01M10.3 3.9 2 18a2 2 0 0 0 1.7 3h16.6a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z"/></svg></div>
+          <div class="kpi-label">Stockout / Low Stock</div>
         </div>
       </div>
-      <div class="kpi-value weeks">{% if kpis.avg_weeks != None %}{{ kpis.avg_weeks }}{% else %}&middot;{% endif %} <span style="font-size:16px; color:var(--ink-soft); font-weight:600;">{% if kpis.avg_weeks != None %}weeks{% endif %}</span></div>
-      <div class="kpi-sub">{% if kpis.avg_weeks == None %}no weeks-of-stock data in view{% else %}{{ period_display }}{% endif %}</div>
+      <div class="kpi-value stockout">{{ kpis.weeks_bands.stockout_low }} <span style="font-size:16px; color:var(--ink-soft); font-weight:600;">CHPs</span></div>
+      <div class="kpi-sub">0&ndash;2 weeks of stock &middot; {{ period_display }}</div>
+    </div>
+    <div class="kpi-card overstocked">
+      <div class="kpi-head">
+        <div class="kpi-head-left">
+          <div class="kpi-icon overstocked"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#B9564A" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="8" width="18" height="13" rx="2"/><path d="M3 8 12 3l9 5"/><path d="M12 12v5"/></svg></div>
+          <div class="kpi-label">Overstocked</div>
+        </div>
+      </div>
+      <div class="kpi-value overstocked">{{ kpis.weeks_bands.overstocked }} <span style="font-size:16px; color:var(--ink-soft); font-weight:600;">CHPs</span></div>
+      <div class="kpi-sub">6+ weeks of stock &middot; {{ period_display }}</div>
     </div>
   </div>
 
   <div class="card">
-    <div class="card-title">Commodity Balances</div>
-    <div class="card-sub">CHP Commodity Stock Flow &middot; {{ period_display }} &middot; totals across the CHP areas currently in view &middot; eCHIS-sourced, not MOH 748</div>
+    <div style="display:flex; align-items:center; justify-content:space-between; gap:8px; flex-wrap:wrap;">
+      <div class="card-title" style="margin:0;">Commodity Balances</div>
+      <a href="{% url 'chp_export_balances' %}?{{ request.GET.urlencode }}" class="btn-download"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/></svg>Download CSV</a>
+    </div>
+    <div class="card-sub">eCHIS backend data &middot; {{ period_display }} &middot; totals across the CHPs currently in view &middot; not MOH 748</div>
     <div style="overflow-x:auto; margin-top:12px;">
       <table class="heatmap">
         <thead>
@@ -170,9 +187,12 @@
   </div>
 
   <div class="card">
-    <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
-      <div class="card-title" style="margin:0;">Generated MOH 748 Preview</div>
-      <span class="pill" style="background:var(--amber-bg); color:#4A3405; font-weight:700;">PREVIEW &middot; not saved</span>
+    <div style="display:flex; align-items:center; justify-content:space-between; gap:8px; flex-wrap:wrap;">
+      <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+        <div class="card-title" style="margin:0;">Generated MOH 748 Preview</div>
+        <span class="pill" style="background:var(--amber-bg); color:#4A3405; font-weight:700;">PREVIEW &middot; not saved</span>
+      </div>
+      <a href="{% url 'chp_export_moh748' %}?{{ request.GET.urlencode }}" class="btn-download"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/></svg>Download CSV</a>
     </div>
     <div class="card-sub">What a facility's MOH 748 would look like generated from this eCHIS scope &middot; {{ period_display }}. Not a real submission and not written anywhere &mdash; this becomes usable per-facility once the CHU-to-facility mapping is linked.</div>
     <div style="overflow-x:auto; margin-top:12px;">
@@ -241,7 +261,7 @@
         </thead>
         <tbody>
           <tr>
-            <td colspan="5" style="text-align:center; color:var(--ink-faint); font-style:italic;">Not available from eCHIS &mdash; this breakdown isn't part of the CHP Commodity Stock Flow data</td>
+            <td colspan="5" style="text-align:center; color:var(--ink-faint); font-style:italic;">Not available from eCHIS &mdash; this breakdown isn't part of the eCHIS backend data</td>
           </tr>
         </tbody>
       </table>
@@ -271,21 +291,21 @@
   {% if level == "choose" %}
   <div class="card">
     <div class="card-title">{{ selected_sub_county_name }}</div>
-    <div class="card-sub">CHP Commodity Stock Flow &middot; {{ period_display }} &middot; choose how you'd like to drill in</div>
+    <div class="card-sub">eCHIS backend data &middot; {{ period_display }} &middot; choose how you'd like to drill in</div>
     <div class="choose-view-row">
       <a href="?period={{ period }}&county={{ selected.county }}&sub_county={{ selected.sub_county }}&view=chus" class="choose-view-card" style="--card-accent:var(--teal);">
         <div class="choose-view-title">
           <span class="commodity-chip" style="background:var(--teal-bg);"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--teal)" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></span>
           View by Community Health Unit
         </div>
-        <div class="choose-view-sub">See a summary for each CHU in {{ selected_sub_county_name }}, then open one CHU's CHP areas.</div>
+        <div class="choose-view-sub">See a summary for each CHU in {{ selected_sub_county_name }}, then open one CHU's CHPs.</div>
       </a>
       <a href="?period={{ period }}&county={{ selected.county }}&sub_county={{ selected.sub_county }}&view=areas" class="choose-view-card" style="--card-accent:var(--pink);">
         <div class="choose-view-title">
           <span class="commodity-chip" style="background:var(--pink-bg);"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--pink)" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21h18"/><path d="M5 21V7l8-4v18"/><path d="M19 21V11l-6-4"/></svg></span>
-          View All CHP Areas
+          View All CHPs
         </div>
-        <div class="choose-view-sub">See every CHP area in {{ selected_sub_county_name }} at once, across all CHUs.</div>
+        <div class="choose-view-sub">See every CHP in {{ selected_sub_county_name }} at once, across all CHUs.</div>
       </a>
     </div>
   </div>
@@ -296,7 +316,7 @@
       <div>
         <div class="card-title">{% if level == "county" %}County Summary{% elif level == "sub_county" %}Sub-County Summary{% else %}CHU Summary{% endif %}</div>
         <div class="card-sub">
-          CHP Commodity Stock Flow &middot; {{ period_display }} &middot; click a card to drill down &middot;
+          eCHIS backend data &middot; {{ period_display }} &middot; click a card to drill down &middot;
           <span class="def-tip" style="font-weight:600; color:var(--ink-soft);">stockout % <span class="bubble">The colored badge is the share of reporting areas with at least one of the 8 tracked commodities out &mdash; not whether any area has a stockout at all (each area tracks 8 commodities, so at least one being out is common). Red &ge;50%, amber &ge;20%, green below that. Hover a badge for the raw count.</span></span>
         </div>
       </div>
@@ -313,7 +333,7 @@
                 </div>
                 <div style="min-width:0;">
                   <div class="unit-card-name">Unresolved geography</div>
-                  <div class="unit-card-sub">Kept, not hidden &mdash; see the CHP Area filter</div>
+                  <div class="unit-card-sub">Kept, not hidden &mdash; see the CHP filter</div>
                 </div>
               </div>
             </div>
@@ -369,10 +389,13 @@
   <div class="card">
     <div style="display:flex; justify-content:space-between; align-items:flex-end; margin-bottom:14px; flex-wrap:wrap; gap:10px;">
       <div>
-        <div class="card-title">CHP Area Stock Status</div>
-        <div class="card-sub">CHP Commodity Stock Flow &middot; {{ period_display }} &middot; showing {{ heatmap.page.start_index }}&ndash;{{ heatmap.page.end_index }} of {{ heatmap.page.paginator.count }} areas &middot; worst stockouts first &middot; each number is units currently on hand, colored by eCHIS's own status (see legend) &middot; hover a cell for weeks of stock</div>
+        <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+          <div class="card-title" style="margin:0;">CHP Stock Status</div>
+          <a href="{% url 'chp_export_stock_status' %}?{{ request.GET.urlencode }}" class="btn-download"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/></svg>Download CSV</a>
+        </div>
+        <div class="card-sub">eCHIS backend data &middot; {{ period_display }} &middot; showing {{ heatmap.page.start_index }}&ndash;{{ heatmap.page.end_index }} of {{ heatmap.page.paginator.count }} CHPs &middot; worst stockouts first &middot; each number is units currently on hand, colored by eCHIS's own status (see legend) &middot; hover a cell for weeks of stock</div>
       </div>
-      <input type="search" name="q" form="chpFilterForm" value="{{ selected.q }}" placeholder="Search CHP area name&hellip;" class="facility-search" onkeydown="if(event.key==='Enter'){event.preventDefault(); this.form.submit();}">
+      <input type="search" name="q" form="chpFilterForm" value="{{ selected.q }}" placeholder="Search CHP name&hellip;" class="facility-search" onkeydown="if(event.key==='Enter'){event.preventDefault(); this.form.submit();}">
     </div>
 
     <div style="overflow-x:auto;">
@@ -384,7 +407,7 @@
         </colgroup>
         <thead>
           <tr>
-            <th>CHP Area</th>
+            <th>CHP</th>
             <th style="text-align:center;">
               Last Received
               <span class="def-tip">&#9432;<span class="bubble">Most recent reporting month this area recorded any commodity received &mdash; across its whole history, not just the period selected above. By month only; eCHIS doesn't give an exact day.</span></span>
@@ -421,7 +444,7 @@
             {% endfor %}
           </tr>
           {% empty %}
-          <tr><td colspan="{{ heatmap.commodities|length|add:2 }}" style="color:var(--ink-soft); padding:20px 8px;">No CHP areas reported for this selection.</td></tr>
+          <tr><td colspan="{{ heatmap.commodities|length|add:2 }}" style="color:var(--ink-soft); padding:20px 8px;">No CHPs reported for this selection.</td></tr>
           {% endfor %}
         </tbody>
       </table>
