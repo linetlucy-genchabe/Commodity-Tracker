@@ -19,24 +19,27 @@
   </a>
   <div style="display:flex; align-items:center; gap:14px;">
     {% comment %}
-      The MOH 748 and CHP Stock Flow tabs share the exact same filter
+      The MOH 748, CHP Stock Flow and S11 tabs share the exact same filter
       vocabulary (period/range, county, sub_county, chu, area, q, view) —
       see _chp_resolve_scope in core/views.py. So switching between them
       carries the current period + geography selection across, instead
       of silently resetting to "all counties, latest period" and making
-      the two tabs look out of sync (e.g. "Current Month" selected on one
-      tab, some other period showing by default on the other). Only done
-      when moving between these two pages themselves — arriving from an
+      the tabs look out of sync (e.g. "Current Month" selected on one
+      tab, some other period showing by default on another). Only done
+      when moving between these three pages themselves — arriving from an
       unrelated page (Uploaded MOH 748 Records, Upload) still lands on
       each tab's default view, since those pages don't share this filter
       vocabulary.
     {% endcomment %}
     <div class="form-switch">
-      <a href="{% url 'chp_moh748' %}{% if request.resolver_match.url_name == 'chp_home' or request.resolver_match.url_name == 'chp_moh748' %}?{{ request.GET.urlencode }}{% endif %}" style="--tab-accent:var(--sky);" class="{% if request.resolver_match.url_name == 'chp_moh748' %}active{% endif %}">
+      <a href="{% url 'chp_moh748' %}{% if request.resolver_match.url_name == 'chp_home' or request.resolver_match.url_name == 'chp_moh748' or request.resolver_match.url_name == 'chp_s11' %}?{{ request.GET.urlencode }}{% endif %}" style="--tab-accent:var(--sky);" class="{% if request.resolver_match.url_name == 'chp_moh748' %}active{% endif %}">
         <span class="tab-dot" style="background:var(--sky);"></span>MOH 748
       </a>
-      <a href="{% url 'chp_home' %}{% if request.resolver_match.url_name == 'chp_home' or request.resolver_match.url_name == 'chp_moh748' %}?{{ request.GET.urlencode }}{% endif %}" style="--tab-accent:var(--teal);" class="{% if request.resolver_match.url_name == 'chp_home' %}active{% endif %}">
+      <a href="{% url 'chp_home' %}{% if request.resolver_match.url_name == 'chp_home' or request.resolver_match.url_name == 'chp_moh748' or request.resolver_match.url_name == 'chp_s11' %}?{{ request.GET.urlencode }}{% endif %}" style="--tab-accent:var(--teal);" class="{% if request.resolver_match.url_name == 'chp_home' %}active{% endif %}">
         <span class="tab-dot" style="background:var(--teal);"></span>CHP Stock Flow
+      </a>
+      <a href="{% url 'chp_s11' %}{% if request.resolver_match.url_name == 'chp_home' or request.resolver_match.url_name == 'chp_moh748' or request.resolver_match.url_name == 'chp_s11' %}?{{ request.GET.urlencode }}{% endif %}" style="--tab-accent:var(--purple);" class="{% if request.resolver_match.url_name == 'chp_s11' %}active{% endif %}">
+        <span class="tab-dot" style="background:var(--purple);"></span>S11
       </a>
     </div>
     <details class="user-menu" id="userMenu">

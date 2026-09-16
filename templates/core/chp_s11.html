@@ -1,0 +1,223 @@
+{% extends "base.html" %}
+{% load static %}
+{% block title %}S11 — Commodity Tracker{% endblock %}
+{% block content %}
+
+<div class="dash-layout">
+
+  <form class="filter-sidebar" id="s11FilterForm" method="get">
+    <input type="hidden" name="view" value="{{ selected.view }}">
+    <div class="sidebar-heading">Filters</div>
+
+    <div class="filter-group">
+      <label for="s11_period">Period</label>
+      <select name="period" id="s11_period" onchange="this.form.submit()">
+        <optgroup label="Quick Range">
+          {% for preset in period_presets %}
+            <option value="range:{{ preset.key }}" {% if selected_range == preset.key or selected_single_preset == preset.key %}selected{% endif %}>{{ preset.label }}</option>
+          {% endfor %}
+        </optgroup>
+        <optgroup label="All Periods">
+          {% for p in periods %}
+            <option value="{{ p }}" {% if p == period and not selected_range and not selected_single_preset %}selected{% endif %}>{{ p }}</option>
+          {% endfor %}
+        </optgroup>
+      </select>
+      <div class="period-resolved-hint">Showing: {{ period_display }}</div>
+    </div>
+    <div class="filter-group">
+      <label for="s11_county">County</label>
+      <select name="county" id="s11_county" onchange="this.form.submit()" class="{% if selected.county %}filter-active{% endif %}">
+        <option value="">All counties</option>
+        {% for c in filters.counties %}
+          <option value="{{ c.id }}" {% if selected.county == c.id|stringformat:"s" %}selected{% endif %}>{{ c.name }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="filter-group">
+      <label for="s11_sub_county">Sub-County</label>
+      <select name="sub_county" id="s11_sub_county" onchange="this.form.submit()" class="{% if selected.sub_county %}filter-active{% endif %}">
+        <option value="">All sub-counties</option>
+        {% for s in filters.sub_counties %}
+          <option value="{{ s.id }}" {% if selected.sub_county == s.id|stringformat:"s" %}selected{% endif %}>{{ s.name }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="filter-group">
+      <label for="s11_chu">Community Health Unit</label>
+      <select name="chu" id="s11_chu" onchange="this.form.submit()" class="{% if selected.chu %}filter-active{% endif %}">
+        <option value="">All CHUs</option>
+        {% for u in filters.chus %}
+          <option value="{{ u.id }}" {% if selected.chu == u.id|stringformat:"s" %}selected{% endif %}>{{ u.name }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="filter-group">
+      <label for="s11_area">CHP</label>
+      <select name="area" id="s11_area" onchange="this.form.submit()" class="{% if selected.area %}filter-active{% endif %}">
+        <option value="">All CHPs</option>
+        {% for a in filters.areas %}
+          <option value="{{ a.id }}" {% if selected.area == a.id|stringformat:"s" %}selected{% endif %}>{{ a.name|default:"Unresolved CHP" }}</option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <div class="sidebar-actions">
+      <a href="{% url 'chp_s11' %}" class="btn btn-outline" style="width:100%; text-align:center; display:block;">Reset filters</a>
+    </div>
+
+    <div class="sidebar-legend">
+      <div class="sidebar-heading">Source</div>
+      <div style="font-size:11.5px; color:var(--ink-soft); line-height:1.5;">Generated from eCHIS backend data &mdash; not an uploaded facility submission. One voucher per CHU; narrows as you filter down to a county, sub-county, CHU or CHP.</div>
+    </div>
+  </form>
+
+<div class="dash-main">
+
+{% if no_data %}
+  <div class="card empty-note">
+    No eCHIS backend data has been uploaded yet.
+    {% if can_upload %}<a href="{% url 'chp_upload' %}">Upload the first month's eCHIS export</a> to get started.{% endif %}
+  </div>
+{% else %}
+
+  {% if selected_area_name %}
+    <div class="card-title" style="font-size:22px; margin-bottom:-4px;">{{ selected_area_name }}</div>
+  {% elif selected_sub_county_name %}
+    <div class="card-title" style="font-size:22px; margin-bottom:-4px;">{{ selected_sub_county_name }}</div>
+  {% elif selected_county_name %}
+    <div class="card-title" style="font-size:22px; margin-bottom:-4px;">{{ selected_county_name }} County</div>
+  {% endif %}
+
+  <div class="card">
+    <div style="display:flex; align-items:center; justify-content:space-between; gap:8px; flex-wrap:wrap;">
+      <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+        <div class="card-title" style="margin:0;">Generated S11</div>
+        <span class="pill" style="background:var(--amber-bg); color:#4A3405; font-weight:700;">GENERATED &middot; not an uploaded submission</span>
+      </div>
+      <a href="{% url 'chp_export_s11' %}?{{ request.GET.urlencode }}" class="btn-download"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/></svg>Download CSV</a>
+    </div>
+    <div class="card-sub">Requisition and Issue Voucher &middot; one draft per Community Health Unit in the scope selected on the left &middot; {{ period_display }}. Not written to any facility's real S11 record.</div>
+
+    {% if not s11.vouchers %}
+      <div class="empty-note">No CHU has eCHIS data for this scope/period yet.</div>
+    {% endif %}
+
+    {% for voucher in s11.vouchers %}
+      <div class="s11-voucher">
+        <div style="display:flex; align-items:baseline; justify-content:space-between; gap:8px; flex-wrap:wrap;">
+          <div class="card-title" style="font-size:14px; border-bottom:none; padding-bottom:0;">
+            {% if voucher.unresolved %}Unresolved CHU{% else %}{{ voucher.chu.name }}{% endif %}
+          </div>
+          <span style="font-size:11px; color:var(--ink-faint);">{{ voucher.areas_count }} CHP area{{ voucher.areas_count|pluralize }} in scope</span>
+        </div>
+
+        <div class="s11-voucher-meta">
+          <div class="s11-voucher-meta-item">
+            <span class="s11-voucher-meta-label">Dept./Branch (Sub-County)</span>
+            {% if voucher.unresolved %}
+              <span class="s11-voucher-meta-value s11-blank">&mdash;</span>
+            {% else %}
+              <span class="s11-voucher-meta-value">{{ voucher.chu.sub_county.name }}</span>
+            {% endif %}
+          </div>
+          <div class="s11-voucher-meta-item">
+            <span class="s11-voucher-meta-label">County</span>
+            {% if voucher.unresolved %}
+              <span class="s11-voucher-meta-value s11-blank">&mdash;</span>
+            {% else %}
+              <span class="s11-voucher-meta-value">{{ voucher.chu.sub_county.county.name }}</span>
+            {% endif %}
+          </div>
+          <div class="s11-voucher-meta-item">
+            <span class="s11-voucher-meta-label">To (Issue Point)</span>
+            {% if not voucher.unresolved and voucher.chu.facility %}
+              <span class="s11-voucher-meta-value">{{ voucher.chu.facility.name }}</span>
+            {% else %}
+              <span class="s11-voucher-meta-value s11-blank" title="No CHU-to-facility mapping on file yet &mdash; fill in by hand">to be filled in</span>
+            {% endif %}
+          </div>
+          <div class="s11-voucher-meta-item">
+            <span class="s11-voucher-meta-label">Listed Below to (Point of Use)</span>
+            <span class="s11-voucher-meta-value">COMMUNITY</span>
+          </div>
+          <div class="s11-voucher-meta-item">
+            <span class="s11-voucher-meta-label">Period</span>
+            <span class="s11-voucher-meta-value">{{ period_display }}</span>
+          </div>
+        </div>
+
+        <div style="overflow-x:auto;">
+          <table class="heatmap">
+            <thead>
+              <tr>
+                <th>Item Description</th>
+                <th>Unit of Issue</th>
+                <th style="text-align:right;">
+                  Quantity Required
+                  <span class="def-tip">&#9432;<span class="bubble">Not captured anywhere in eCHIS's digital export &mdash; CHUs record this on the paper Form S11, not through the app. Always 0 here until that changes.</span></span>
+                </th>
+                <th style="text-align:right;">
+                  Quantity Issued
+                  <span class="def-tip">&#9432;<span class="bubble">What this CHU received over the period, from CHP Commodity Stock Flow &mdash; the same transaction as "issued" from the supply point's side.</span></span>
+                </th>
+                <th>
+                  Value / Remarks
+                  <span class="def-tip">&#9432;<span class="bubble">Not tracked anywhere in this dashboard's data.</span></span>
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for row in voucher.rows %}
+              <tr>
+                <td style="font-weight:600;">
+                  <span class="row-identity">
+                    <span class="commodity-chip" style="background:{{ row.color }}1F;"><span class="dot" style="background:{{ row.color }};"></span></span>
+                    {{ row.commodity.label }}
+                  </span>
+                </td>
+                <td>{{ row.unit_of_issue }}</td>
+                <td style="text-align:right;" class="mono mono-faint" title="Not captured by eCHIS &mdash; a paper-only figure right now">0</td>
+                <td style="text-align:right;" class="mono{% if row.quantity_issued == None %} mono-faint{% endif %}">{{ row.quantity_issued|default_if_none:"0" }}</td>
+                <td class="mono-faint">&mdash;</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+
+        <div class="s11-signoff">
+          <div class="s11-signoff-field">
+            <span class="s11-signoff-label">Requisition Officer / Designation</span>
+            <span class="s11-blank-line"></span>
+          </div>
+          <div class="s11-signoff-field">
+            <span class="s11-signoff-label">Issued By / Signature</span>
+            <span class="s11-blank-line"></span>
+          </div>
+          <div class="s11-signoff-field">
+            <span class="s11-signoff-label">Received By / Designation</span>
+            <span class="s11-blank-line"></span>
+          </div>
+          <div class="s11-signoff-field">
+            <span class="s11-signoff-label">Date</span>
+            <span class="s11-blank-line"></span>
+          </div>
+        </div>
+      </div>
+    {% endfor %}
+
+    {% if s11.page.paginator.num_pages > 1 %}
+      <div class="pagination">
+        {% if s11.page.has_previous %}<a href="?{{ request.GET.urlencode }}&page={{ s11.page.previous_page_number }}">&larr; Previous</a>{% endif %}
+        <span style="color:var(--ink-soft);">Page {{ s11.page.number }} of {{ s11.page.paginator.num_pages }} &middot; {{ s11.page.paginator.count }} CHU{{ s11.page.paginator.count|pluralize }} in scope</span>
+        {% if s11.page.has_next %}<a href="?{{ request.GET.urlencode }}&page={{ s11.page.next_page_number }}">Next &rarr;</a>{% endif %}
+      </div>
+    {% endif %}
+  </div>
+
+{% endif %}
+</div>
+
+</div>
+{% endblock %}

@@ -41,6 +41,10 @@ from .parsing import parse_chp_commodity_workbook, parse_moh748_workbook
 
 PAGE_SIZE = 25
 TREND_MONTHS = 12
+# Each S11 voucher is a full card (13 commodity rows plus a header), so a
+# much smaller page size than the 25-row heatmap keeps the page scrollable
+# rather than one huge stack of cards.
+S11_PAGE_SIZE = 5
 
 
 # ---------------------------------------------------------------------------
@@ -453,6 +457,29 @@ CHP_COMMODITY_COLOR_MAP = {
     CHPCommodity.GLUCOMETER_STRIPS: "#E08A1E",
     CHPCommodity.GLOVES: "#5FB3A3",
     CHPCommodity.DISPENSING_ENVELOPES: "#B85C7A",
+}
+
+# "Unit of Issue" as it appears on eCHIS's own "Balance on Hand" screen —
+# Form S11 (Requisition and Issue Voucher) has this exact column, so the
+# generated S11 uses the same wording eCHIS already shows for each
+# commodity. PARACETAMOL here covers the tablet form only (500mg) — eCHIS's
+# Commodities Order form also has a separate Paracetamol 120mg/5ml
+# Suspension line (unit: Bottles) that isn't a CHPCommodity of its own, so
+# it never appears on this page. Anything not listed falls back to "Units".
+CHP_S11_UNIT_OF_ISSUE = {
+    CHPCommodity.AL_6: "Packs",
+    CHPCommodity.AL_12: "Packs",
+    CHPCommodity.AL_18: "Packs",
+    CHPCommodity.AL_24: "Packs",
+    CHPCommodity.RDTS: "Kits",
+    CHPCommodity.AMOXICILLIN_DT250: "Tablets",
+    CHPCommodity.ORS_ZINC: "Pieces",
+    CHPCommodity.ORS_SACHETS: "Sachets",
+    CHPCommodity.ZINC_SULPHATE: "Tablets",
+    CHPCommodity.PARACETAMOL: "Tablets",
+    CHPCommodity.GLUCOMETER_STRIPS: "Strips",
+    CHPCommodity.GLOVES: "Pairs",
+    CHPCommodity.DISPENSING_ENVELOPES: "Pieces",
 }
 
 
@@ -1130,6 +1157,101 @@ def build_chp_moh748_preview(records_qs, *, period_range=None):
 
 
 # ---------------------------------------------------------------------------
+# Generated S11 (Requisition and Issue Voucher) — draft, per CHU
+#
+# Lynne shared a photo of the actual paper Form S11: it wants, per
+# commodity, a Quantity Required (what the CHU/CHA asked for) and a
+# Quantity Issued (what the issuing store actually gave out), plus a
+# Code No./Value/Remarks that this dashboard has no source for at all.
+#
+# Checked against the raw commodities_order eCHIS export (the "second data"
+# file): its required_* fields — the digital equivalent of "Quantity
+# Required" — are blank or zero in effectively every row (only 8 of 54
+# commodity columns had ANY non-zero value across 738 submissions, and only
+# 9 of 162 CHUs ever recorded one). So Quantity Required isn't something
+# this dashboard can populate from eCHIS at all right now — it's a paper-
+# only figure — and is always shown as 0, same "zero-fill for a draft"
+# treatment as the rest of the Generated MOH 748 page. Quantity Issued
+# reuses quantity_received from CHP Commodity Stock Flow: what a CHU
+# received from its issuing point over the period IS what that point
+# issued, so it's the same number from the other side of the transaction —
+# and unlike Required, this one is real eCHIS data, not zero-filled.
+# ---------------------------------------------------------------------------
+
+
+def _build_chp_s11_vouchers(records_qs, areas_qs):
+    """
+    One voucher per CHU in scope — Form S11 is filled "to (point of use):
+    COMMUNITY", i.e. at CHU level, not per CHP area, so every CHP area's
+    records within a CHU are pooled into that CHU's one voucher. An area
+    with no resolved CHU still gets counted, as one combined "Unresolved
+    CHU" voucher, rather than silently dropped — same principle as
+    build_chp_geo_summary()'s unresolved row.
+    """
+
+    def _rows_for(unit_records):
+        rows = []
+        for commodity in CHPCommodity:
+            commodity_qs = unit_records.filter(commodity=commodity)
+            quantity_issued = commodity_qs.aggregate(v=Sum("quantity_received"))["v"]
+            rows.append(
+                {
+                    "commodity": commodity,
+                    "unit_of_issue": CHP_S11_UNIT_OF_ISSUE.get(commodity, "Units"),
+                    "quantity_issued": quantity_issued,
+                    "color": CHP_COMMODITY_COLOR_MAP[commodity],
+                }
+            )
+        return rows
+
+    unit_ids = (
+        areas_qs.exclude(community_health_unit__isnull=True)
+        .values_list("community_health_unit_id", flat=True)
+        .distinct()
+    )
+    chus = (
+        CommunityHealthUnit.objects.filter(id__in=unit_ids)
+        .select_related("sub_county__county", "facility")
+        .order_by("sub_county__county__name", "sub_county__name", "name")
+    )
+
+    vouchers = []
+    for chu in chus:
+        unit_areas = areas_qs.filter(community_health_unit=chu)
+        unit_records = records_qs.filter(chp_area__in=unit_areas)
+        vouchers.append(
+            {
+                "chu": chu,
+                "unresolved": False,
+                "areas_count": unit_areas.count(),
+                "rows": _rows_for(unit_records),
+            }
+        )
+
+    unresolved_areas = areas_qs.filter(community_health_unit__isnull=True)
+    if unresolved_areas.exists():
+        unresolved_records = records_qs.filter(chp_area__in=unresolved_areas)
+        vouchers.append(
+            {
+                "chu": None,
+                "unresolved": True,
+                "areas_count": unresolved_areas.count(),
+                "rows": _rows_for(unresolved_records),
+            }
+        )
+
+    return vouchers
+
+
+def build_chp_s11_summary(records_qs, areas_qs, *, page_number=1):
+    """Paginated wrapper around _build_chp_s11_vouchers() for the on-screen page — see that function's docstring."""
+    vouchers = _build_chp_s11_vouchers(records_qs, areas_qs)
+    paginator = Paginator(vouchers, S11_PAGE_SIZE)
+    page_obj = paginator.get_page(page_number)
+    return {"vouchers": page_obj.object_list, "page": page_obj}
+
+
+# ---------------------------------------------------------------------------
 # Upload form (formerly moh748/forms.py)
 # ---------------------------------------------------------------------------
 
@@ -1650,6 +1772,67 @@ def chp_moh748_page(request):
     return render(request, "core/chp_moh748.html", context)
 
 
+@login_required
+def chp_s11_page(request):
+    """
+    The standalone "S11" nav tab — a draft Form S11 (Requisition and Issue
+    Voucher), one card per CHU in the current scope, generated from
+    whatever eCHIS backend data (CHP Commodity Stock Flow) is on file.
+    Shares scope resolution, period presets and geography filters with the
+    MOH 748 and CHP Stock Flow pages (_chp_resolve_scope, chp_filter_options,
+    chp_period_presets), so all three never disagree about what's in view
+    for the same filter selection. See _build_chp_s11_vouchers()'s docstring
+    for what is and isn't populated from real data on this page.
+    """
+    scope = _chp_resolve_scope(request)
+    user = scope["user"]
+    county_id = scope["county_id"]
+    sub_county_id = scope["sub_county_id"]
+    chu_id = scope["chu_id"]
+    area_id = scope["area_id"]
+
+    selected_county_name = ""
+    if county_id:
+        selected_county_name = County.objects.filter(id=county_id).values_list("name", flat=True).first() or ""
+    selected_sub_county_name = ""
+    if sub_county_id:
+        selected_sub_county_name = (
+            SubCounty.objects.filter(id=sub_county_id).values_list("name", flat=True).first() or ""
+        )
+    selected_area_name = ""
+    if area_id:
+        selected_area_name = CHPArea.objects.filter(id=area_id).values_list("name", flat=True).first() or ""
+
+    try:
+        page_number = int(request.GET.get("page", 1))
+    except ValueError:
+        page_number = 1
+
+    context = {
+        "no_data": not scope["periods"],
+        "periods": scope["periods"],
+        "period": scope["period"],
+        "period_display": scope["period_display_label"],
+        "period_presets": chp_period_presets(),
+        "selected_range": scope["range_key"] or "",
+        "selected_single_preset": scope["selected_single_preset"] or "",
+        "filters": chp_filter_options(user, county_id=county_id, sub_county_id=sub_county_id, chu_id=chu_id),
+        "selected": {
+            "county": county_id or "",
+            "sub_county": sub_county_id or "",
+            "chu": chu_id or "",
+            "area": area_id or "",
+            "q": scope["search_query"],
+            "view": scope["view_param"] or "",
+        },
+        "selected_county_name": selected_county_name,
+        "selected_sub_county_name": selected_sub_county_name,
+        "selected_area_name": selected_area_name,
+        "s11": build_chp_s11_summary(scope["records"], scope["filtered_areas"], page_number=page_number),
+    }
+    return render(request, "core/chp_s11.html", context)
+
+
 def _chp_csv_response(filename, header, rows):
     response = HttpResponse(content_type="text/csv")
     response["Content-Disposition"] = f'attachment; filename="{filename}"'
@@ -1722,6 +1905,46 @@ def export_chp_moh748_csv(request):
         for row in rows
     ]
     filename = f"generated-moh748-preview-{scope['range_key'] or scope['period'] or 'all'}.csv"
+    return _chp_csv_response(filename, header, data)
+
+
+@login_required
+def export_chp_s11_csv(request):
+    """
+    CSV of every CHU's draft S11 voucher in the current scope (not just the
+    on-screen page of them) — Quantity Required is always 0, same caveat as
+    the on-screen page: see _build_chp_s11_vouchers()'s docstring.
+    """
+    scope = _chp_resolve_scope(request)
+    vouchers = _build_chp_s11_vouchers(scope["records"], scope["filtered_areas"])
+    header = [
+        "Community Health Unit",
+        "Sub-County",
+        "County",
+        "Item Description",
+        "Unit of Issue",
+        "Quantity Required",
+        "Quantity Issued",
+    ]
+    data = []
+    for voucher in vouchers:
+        chu = voucher["chu"]
+        chu_name = chu.name if chu else "Unresolved CHU"
+        sub_county_name = chu.sub_county.name if chu else ""
+        county_name = chu.sub_county.county.name if chu else ""
+        for row in voucher["rows"]:
+            data.append(
+                [
+                    chu_name,
+                    sub_county_name,
+                    county_name,
+                    row["commodity"].label,
+                    row["unit_of_issue"],
+                    0,
+                    row["quantity_issued"] or 0,
+                ]
+            )
+    filename = f"generated-s11-{scope['range_key'] or scope['period'] or 'all'}.csv"
     return _chp_csv_response(filename, header, data)
 
 
