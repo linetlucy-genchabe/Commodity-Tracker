@@ -1365,25 +1365,67 @@ def _chp_resolve_scope(request):
     the period + geography filters on screen — never the whole table
     regardless of what's selected.
 
-    Two period modes: ?period=YYYY-MM picks one month, as always. ?range=
-    one of chp_period_presets()'s range keys (currently "last_2_months" or
-    "last_full_quarter") picks a multi-month window instead -- "records" is
-    every record across that whole window (period__gte/__lte, safe for
-    these zero-padded "YYYY-MM" strings), "period_range" is the (earliest,
-    latest) tuple the range-aware builder functions need for their
-    Beginning/Ending Balance split, and "latest_records" is just the
-    window's last month -- what the heatmap uses, since a stock-status
-    snapshot can't sensibly be rolled up across months the way a total can.
-    An unrecognised/missing range falls back to single-period mode.
+    One dropdown, one param: Lynne asked for the Period filter and the
+    quick-range presets to live in a single dropdown rather than a
+    dropdown plus a separate row of preset chips. So the sidebar's Period
+    <select> carries both — a literal "YYYY-MM" option for each real
+    period, and one "range:<key>" option per chp_period_presets() entry
+    (e.g. "range:last_full_quarter" or "range:current_month") — all under
+    the one ?period= param. A "range:" prefix is peeled off and looked up
+    against chp_period_presets(): a "range"-kind preset (Last 2 Months,
+    Last Full Quarter) resolves to a multi-month window; a "single"-kind
+    preset (Current Month, Last Month) just resolves to that preset's own
+    literal period -- it's in the same dropdown for convenience, but
+    behaves exactly like picking that YYYY-MM directly, no multi-month
+    aggregation involved. Anything without a "range:" prefix is a literal
+    period, exactly as before. ?range=<key> is still accepted on its own
+    (range-kind keys only) as a fallback for any old bookmarked/shared link.
+
+    "records" is every record in the resolved window (period__gte/__lte,
+    safe for these zero-padded "YYYY-MM" strings) or just the one period;
+    "period_range" is the (earliest, latest) tuple the range-aware builder
+    functions need for their Beginning/Ending Balance split; "latest_records"
+    is just the window's last month -- what the heatmap uses, since a
+    stock-status snapshot can't sensibly be rolled up across months the
+    way a total can. An unrecognised/missing range falls back to
+    single-period mode.
     """
     user = request.user
     areas = chp_scoped_areas(user)
 
     periods = chp_available_periods()
-    range_key = request.GET.get("range") or None
-    resolved_range = chp_resolve_period_range(range_key) if range_key else None
+    period_param = request.GET.get("period") or ""
 
-    period = request.GET.get("period") or (periods[0] if periods else "")
+    selected_preset = None
+    if period_param.startswith("range:"):
+        preset_key = period_param[len("range:"):]
+        selected_preset = next((p for p in chp_period_presets() if p["key"] == preset_key), None)
+
+    range_key = None
+    resolved_range = None
+    selected_single_preset = None
+    if selected_preset and selected_preset["kind"] == "range":
+        range_key = selected_preset["key"]
+        resolved_range = (selected_preset["start"], selected_preset["end"])
+    elif selected_preset and selected_preset["kind"] == "single":
+        selected_single_preset = selected_preset["key"]
+    elif not period_param.startswith("range:"):
+        # Backward-compat: an old link/bookmark using the standalone
+        # ?range= param (range-kind keys only).
+        legacy_range_key = request.GET.get("range") or None
+        if legacy_range_key:
+            resolved_range = chp_resolve_period_range(legacy_range_key)
+            if resolved_range:
+                range_key = legacy_range_key
+
+    if resolved_range:
+        period = periods[0] if periods else ""
+    elif selected_single_preset:
+        period = selected_preset["period"]
+    else:
+        period = (period_param if not period_param.startswith("range:") else "") or (
+            periods[0] if periods else ""
+        )
 
     county_id = request.GET.get("county") or None
     sub_county_id = request.GET.get("sub_county") or None
@@ -1420,6 +1462,7 @@ def _chp_resolve_scope(request):
         "periods": periods,
         "period": period,
         "range_key": range_key,
+        "selected_single_preset": selected_single_preset,
         "period_range": resolved_range,
         "period_display_label": period_display_label,
         "county_id": county_id,
@@ -1497,6 +1540,7 @@ def chp_commodity_home(request):
         "period_display": scope["period_display_label"],
         "period_presets": chp_period_presets(),
         "selected_range": range_key or "",
+        "selected_single_preset": scope["selected_single_preset"] or "",
         "filters": chp_filter_options(user, county_id=county_id, sub_county_id=sub_county_id, chu_id=chu_id),
         "selected": {
             "county": county_id or "",
@@ -1580,6 +1624,7 @@ def chp_moh748_page(request):
         "period_display": scope["period_display_label"],
         "period_presets": chp_period_presets(),
         "selected_range": scope["range_key"] or "",
+        "selected_single_preset": scope["selected_single_preset"] or "",
         "filters": chp_filter_options(user, county_id=county_id, sub_county_id=sub_county_id, chu_id=chu_id),
         "selected": {
             "county": county_id or "",

@@ -12,24 +12,17 @@
     <div class="filter-group">
       <label for="chp_period">Period</label>
       <select name="period" id="chp_period" onchange="this.form.submit()">
-        {% for p in periods %}
-          <option value="{{ p }}" {% if p == period and not selected_range %}selected{% endif %}>{{ p }}</option>
-        {% endfor %}
+        <optgroup label="Quick Range">
+          {% for preset in period_presets %}
+            <option value="range:{{ preset.key }}" {% if selected_range == preset.key or selected_single_preset == preset.key %}selected{% endif %}>{{ preset.label }} &mdash; {{ preset.display }}</option>
+          {% endfor %}
+        </optgroup>
+        <optgroup label="All Periods">
+          {% for p in periods %}
+            <option value="{{ p }}" {% if p == period and not selected_range and not selected_single_preset %}selected{% endif %}>{{ p }}</option>
+          {% endfor %}
+        </optgroup>
       </select>
-    </div>
-    <div class="filter-group">
-      <label>Quick Range</label>
-      <div class="preset-chip-row">
-        {% for preset in period_presets %}
-          <a
-            href="?{% if preset.kind == 'single' %}period={{ preset.period }}{% else %}range={{ preset.key }}{% endif %}&county={{ selected.county }}&sub_county={{ selected.sub_county }}&chu={{ selected.chu }}&area={{ selected.area }}&view={{ selected.view }}{% if selected.q %}&q={{ selected.q|urlencode }}{% endif %}"
-            class="preset-chip{% if preset.kind == 'single' and not selected_range and preset.period == period %} active{% endif %}{% if preset.kind == 'range' and selected_range == preset.key %} active{% endif %}"
-          >
-            <span class="preset-chip-label">{{ preset.label }}</span>
-            <span class="preset-chip-sub">{{ preset.display }}</span>
-          </a>
-        {% endfor %}
-      </div>
     </div>
     <div class="filter-group">
       <label for="chp_county">County</label>
@@ -184,13 +177,13 @@
                 {{ row.commodity.label }}
               </span>
             </td>
-            <td style="text-align:right;" class="mono{% if row.beginning_balance == None %} mono-faint{% endif %}">{{ row.beginning_balance|default_if_none:"&middot;" }}</td>
-            <td style="text-align:right;" class="mono{% if row.quantity_received == None %} mono-faint{% endif %}">{{ row.quantity_received|default_if_none:"&middot;" }}</td>
-            <td style="text-align:right;" class="mono{% if row.stock_on_hand == None %} mono-faint{% endif %}">{{ row.stock_on_hand|default_if_none:"&middot;" }}</td>
-            <td style="text-align:right;" class="mono{% if row.quantity_dispensed == None %} mono-faint{% endif %}">{{ row.quantity_dispensed|default_if_none:"&middot;" }}{% if row.flagged_rows_excluded %} <span class="row-sublabel" style="display:inline;" title="{{ row.flagged_rows_excluded }} row(s) excluded &mdash; flagged by eCHIS as an implausible quantity">({{ row.flagged_rows_excluded }} excluded)</span>{% endif %}</td>
-            <td style="text-align:right;" class="mono{% if row.ending_balance == None %} mono-faint{% endif %}">{{ row.ending_balance|default_if_none:"&middot;" }}</td>
+            <td style="text-align:right;" class="mono{% if row.beginning_balance == None %} mono-faint{% endif %}">{{ row.beginning_balance|default_if_none:"0" }}</td>
+            <td style="text-align:right;" class="mono{% if row.quantity_received == None %} mono-faint{% endif %}">{{ row.quantity_received|default_if_none:"0" }}</td>
+            <td style="text-align:right;" class="mono{% if row.stock_on_hand == None %} mono-faint{% endif %}">{{ row.stock_on_hand|default_if_none:"0" }}</td>
+            <td style="text-align:right;" class="mono{% if row.quantity_dispensed == None %} mono-faint{% endif %}">{{ row.quantity_dispensed|default_if_none:"0" }}{% if row.flagged_rows_excluded %} <span class="row-sublabel" style="display:inline;" title="{{ row.flagged_rows_excluded }} row(s) excluded &mdash; flagged by eCHIS as an implausible quantity">({{ row.flagged_rows_excluded }} excluded)</span>{% endif %}</td>
+            <td style="text-align:right;" class="mono{% if row.ending_balance == None %} mono-faint{% endif %}">{{ row.ending_balance|default_if_none:"0" }}</td>
             <td style="text-align:center;">
-              {% if row.avg_weeks_of_stock == None %}<span class="mono mono-faint">&middot;</span>
+              {% if row.avg_weeks_of_stock == None %}<span class="mono mono-faint">0</span>
               {% else %}<span class="pill {{ row.weeks_status }}">{{ row.avg_weeks_of_stock }}{% if row.weeks_overstocked %} (overstocked){% endif %}</span>{% endif %}
             </td>
           </tr>
@@ -240,21 +233,17 @@
                 {{ row.commodity_label }}
               </span>
             </td>
-            {% if row.available %}
-              <td style="text-align:right;" class="mono{% if row.beginning_balance == None %} mono-faint{% endif %}">{{ row.beginning_balance|default_if_none:"&middot;" }}</td>
-              <td style="text-align:right;" class="mono{% if row.quantity_received == None %} mono-faint{% endif %}">{{ row.quantity_received|default_if_none:"&middot;" }}</td>
-              <td style="text-align:right;" class="mono{% if row.total_dispensed == None %} mono-faint{% endif %}">{{ row.total_dispensed|default_if_none:"&middot;" }}{% if row.flagged_rows_excluded %} <span class="row-sublabel" style="display:inline;" title="{{ row.flagged_rows_excluded }} row(s) excluded &mdash; flagged by eCHIS as an implausible quantity">({{ row.flagged_rows_excluded }} excluded)</span>{% endif %}</td>
-              <td style="text-align:right;" class="mono mono-faint" title="Not available from eCHIS">&middot;</td>
-              <td style="text-align:right;" class="mono{% if row.physical_count == None %} mono-faint{% endif %}">{{ row.physical_count|default_if_none:"&middot;" }}</td>
-              <td style="text-align:center;">
-                {% if row.estimated_days_out_of_stock == None %}<span class="mono mono-faint">&middot;</span>
-                {% elif row.estimated_days_out_of_stock == 0 %}<span class="pill GREEN">{{ row.estimated_days_out_of_stock }}</span>
-                {% elif row.estimated_days_out_of_stock < 7 %}<span class="pill AMBER">{{ row.estimated_days_out_of_stock }}</span>
-                {% else %}<span class="pill RED">{{ row.estimated_days_out_of_stock }}</span>{% endif %}
-              </td>
-            {% else %}
-              <td colspan="6" style="text-align:center; color:var(--ink-faint); font-style:italic;">Not available from eCHIS</td>
-            {% endif %}
+            <td style="text-align:right;" class="mono{% if row.beginning_balance == None %} mono-faint{% endif %}">{{ row.beginning_balance|default_if_none:"0" }}</td>
+            <td style="text-align:right;" class="mono{% if row.quantity_received == None %} mono-faint{% endif %}">{{ row.quantity_received|default_if_none:"0" }}</td>
+            <td style="text-align:right;" class="mono{% if row.total_dispensed == None %} mono-faint{% endif %}">{{ row.total_dispensed|default_if_none:"0" }}{% if row.flagged_rows_excluded %} <span class="row-sublabel" style="display:inline;" title="{{ row.flagged_rows_excluded }} row(s) excluded &mdash; flagged by eCHIS as an implausible quantity">({{ row.flagged_rows_excluded }} excluded)</span>{% endif %}</td>
+            <td style="text-align:right;" class="mono mono-faint" title="Not present in eCHIS's export at this reporting grain">0</td>
+            <td style="text-align:right;" class="mono{% if row.physical_count == None %} mono-faint{% endif %}">{{ row.physical_count|default_if_none:"0" }}</td>
+            <td style="text-align:center;">
+              {% if row.estimated_days_out_of_stock == None %}<span class="pill GREEN">0</span>
+              {% elif row.estimated_days_out_of_stock == 0 %}<span class="pill GREEN">{{ row.estimated_days_out_of_stock }}</span>
+              {% elif row.estimated_days_out_of_stock < 7 %}<span class="pill AMBER">{{ row.estimated_days_out_of_stock }}</span>
+              {% else %}<span class="pill RED">{{ row.estimated_days_out_of_stock }}</span>{% endif %}
+            </td>
           </tr>
           {% endfor %}
         </tbody>
@@ -274,9 +263,20 @@
           </tr>
         </thead>
         <tbody>
+          {% for row in moh748_preview %}
           <tr>
-            <td colspan="5" style="text-align:center; color:var(--ink-faint); font-style:italic;">Not available from eCHIS &mdash; this breakdown isn't part of the eCHIS backend data</td>
+            <td style="font-weight:600;">
+              <span class="row-identity">
+                <span class="commodity-chip" style="background:{{ row.color }}1F;"><span class="dot" style="background:{{ row.color }};"></span></span>
+                {{ row.commodity_label }}
+              </span>
+            </td>
+            <td style="text-align:center;" class="mono mono-faint" title="Not part of the eCHIS backend data">0</td>
+            <td style="text-align:center;" class="mono mono-faint" title="Not part of the eCHIS backend data">0</td>
+            <td style="text-align:center;" class="mono mono-faint" title="Not part of the eCHIS backend data">0</td>
+            <td style="text-align:center;" class="mono mono-faint" title="Not part of the eCHIS backend data">0</td>
           </tr>
+          {% endfor %}
         </tbody>
       </table>
     </div>
@@ -292,11 +292,11 @@
           </tr>
         </thead>
         <tbody>
-          <tr><td>No. Positive</td><td colspan="2" class="mono mono-faint" style="text-align:center;">Not available from eCHIS</td></tr>
-          <tr><td>No. Negative</td><td colspan="2" class="mono mono-faint" style="text-align:center;">Not available from eCHIS</td></tr>
-          <tr><td>No. Not Tested</td><td colspan="2" class="mono mono-faint" style="text-align:center;">Not available from eCHIS</td></tr>
-          <tr><td>No. Invalid</td><td colspan="2" class="mono mono-faint" style="text-align:center;">Not available from eCHIS</td></tr>
-          <tr><td style="font-weight:600;">Total</td><td colspan="2" class="mono mono-faint" style="text-align:center;">Not available from eCHIS</td></tr>
+          <tr><td>No. Positive</td><td class="mono mono-faint" style="text-align:center;" title="Not part of the eCHIS backend data">0</td><td class="mono mono-faint" style="text-align:center;" title="Not part of the eCHIS backend data">0</td></tr>
+          <tr><td>No. Negative</td><td class="mono mono-faint" style="text-align:center;" title="Not part of the eCHIS backend data">0</td><td class="mono mono-faint" style="text-align:center;" title="Not part of the eCHIS backend data">0</td></tr>
+          <tr><td>No. Not Tested</td><td class="mono mono-faint" style="text-align:center;" title="Not part of the eCHIS backend data">0</td><td class="mono mono-faint" style="text-align:center;" title="Not part of the eCHIS backend data">0</td></tr>
+          <tr><td>No. Invalid</td><td class="mono mono-faint" style="text-align:center;" title="Not part of the eCHIS backend data">0</td><td class="mono mono-faint" style="text-align:center;" title="Not part of the eCHIS backend data">0</td></tr>
+          <tr><td style="font-weight:600;">Total</td><td class="mono mono-faint" style="text-align:center;" title="Not part of the eCHIS backend data">0</td><td class="mono mono-faint" style="text-align:center;" title="Not part of the eCHIS backend data">0</td></tr>
         </tbody>
       </table>
     </div>
