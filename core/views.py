@@ -1562,7 +1562,15 @@ def chp_commodity_home(request):
     # month), which doesn't roll up across months the way a total does —
     # so in range mode it always shows the range's last month, same as
     # picking that single month on its own would.
-    if level == "area":
+    #
+    # Skipped once a single CHP is selected (area_id set): at that point
+    # it's always exactly one row, and everything in it — which
+    # commodities are low, the status colors — is already visible in
+    # Commodity Balances and the Generated MOH 748 preview above it.
+    # Lynne flagged this as duplicated work; the heatmap earns its place
+    # comparing MANY CHPs at once (a CHU or sub-county in view), not
+    # re-describing the one CHP already on screen.
+    if level == "area" and not area_id:
         context["heatmap"] = build_chp_heatmap(latest_records, page_number=page_number)
     elif level in ("county", "sub_county", "chu"):
         context["geo_summary"] = build_chp_geo_summary(records, filtered_areas, group_by=level)
