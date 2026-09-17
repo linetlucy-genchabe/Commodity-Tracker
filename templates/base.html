@@ -10,7 +10,7 @@
 <body>
 {% if user.is_authenticated %}
 <div class="app-header">
-  <a href="{% url 'chp_moh748' %}" class="brand" style="text-decoration:none; color:inherit;">
+  <a href="{% url 'chp_home' %}" class="brand" style="text-decoration:none; color:inherit;">
     <div class="brand-mark">CT</div>
     <div>
       <div class="brand-name">Commodity Tracker</div>
@@ -32,11 +32,11 @@
       vocabulary.
     {% endcomment %}
     <div class="form-switch">
-      <a href="{% url 'chp_moh748' %}{% if request.resolver_match.url_name == 'chp_home' or request.resolver_match.url_name == 'chp_moh748' or request.resolver_match.url_name == 'chp_s11' %}?{{ request.GET.urlencode }}{% endif %}" style="--tab-accent:var(--sky);" class="{% if request.resolver_match.url_name == 'chp_moh748' %}active{% endif %}">
-        <span class="tab-dot" style="background:var(--sky);"></span>MOH 748
-      </a>
       <a href="{% url 'chp_home' %}{% if request.resolver_match.url_name == 'chp_home' or request.resolver_match.url_name == 'chp_moh748' or request.resolver_match.url_name == 'chp_s11' %}?{{ request.GET.urlencode }}{% endif %}" style="--tab-accent:var(--teal);" class="{% if request.resolver_match.url_name == 'chp_home' %}active{% endif %}">
         <span class="tab-dot" style="background:var(--teal);"></span>CHP Stock Flow
+      </a>
+      <a href="{% url 'chp_moh748' %}{% if request.resolver_match.url_name == 'chp_home' or request.resolver_match.url_name == 'chp_moh748' or request.resolver_match.url_name == 'chp_s11' %}?{{ request.GET.urlencode }}{% endif %}" style="--tab-accent:var(--sky);" class="{% if request.resolver_match.url_name == 'chp_moh748' %}active{% endif %}">
+        <span class="tab-dot" style="background:var(--sky);"></span>MOH 748
       </a>
       <a href="{% url 'chp_s11' %}{% if request.resolver_match.url_name == 'chp_home' or request.resolver_match.url_name == 'chp_moh748' or request.resolver_match.url_name == 'chp_s11' %}?{{ request.GET.urlencode }}{% endif %}" style="--tab-accent:var(--purple);" class="{% if request.resolver_match.url_name == 'chp_s11' %}active{% endif %}">
         <span class="tab-dot" style="background:var(--purple);"></span>S11

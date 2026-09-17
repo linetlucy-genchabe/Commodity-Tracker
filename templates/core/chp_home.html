@@ -44,6 +44,15 @@
       </select>
     </div>
     <div class="filter-group">
+      <label for="chp_facility">Facility</label>
+      <select name="facility" id="chp_facility" onchange="this.form.submit()" class="{% if selected.facility %}filter-active{% endif %}">
+        <option value="">All facilities</option>
+        {% for f in filters.facilities %}
+          <option value="{{ f.id }}" {% if selected.facility == f.id|stringformat:"s" %}selected{% endif %}>{{ f.name }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="filter-group">
       <label for="chp_chu">Community Health Unit</label>
       <select name="chu" id="chp_chu" onchange="this.form.submit()" class="{% if selected.chu %}filter-active{% endif %}">
         <option value="">All CHUs</option>
@@ -189,115 +198,6 @@
             </td>
           </tr>
           {% endfor %}
-        </tbody>
-      </table>
-    </div>
-  </div>
-
-  <div class="card">
-    <div style="display:flex; align-items:center; justify-content:space-between; gap:8px; flex-wrap:wrap;">
-      <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
-        <div class="card-title" style="margin:0;">Generated MOH 748 Preview</div>
-        <span class="pill" style="background:var(--amber-bg); color:#4A3405; font-weight:700;">PREVIEW &middot; not saved</span>
-      </div>
-      <a href="{% url 'chp_export_moh748' %}?{{ request.GET.urlencode }}" class="btn-download"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/></svg>Download CSV</a>
-    </div>
-    <div class="card-sub">What a facility's MOH 748 would look like generated from this eCHIS scope &middot; {{ period_display }}. Not a real submission and not written anywhere &mdash; this becomes usable per-facility once the CHU-to-facility mapping is linked.</div>
-    <div style="overflow-x:auto; margin-top:12px;">
-      <table class="heatmap">
-        <thead>
-          <tr>
-            <th>Drug Name</th>
-            <th style="text-align:right;">A. Begin. Balance</th>
-            <th style="text-align:right;">B. Received</th>
-            <th style="text-align:right;">
-              C. Dispensed
-              <span class="def-tip">&#9432;<span class="bubble">Excludes rows eCHIS itself flagged as an implausible dispensed quantity &mdash; those rows' other fields are kept.</span></span>
-            </th>
-            <th style="text-align:right;">
-              D. Losses (Excl. Expiries)
-              <span class="def-tip">&#9432;<span class="bubble">Not present in eCHIS's export at this reporting grain &mdash; eCHIS records stock amendments/discrepancies as separate events, not a direct Losses field. Always blank here.</span></span>
-            </th>
-            <th style="text-align:right;">E. Balance / Physical Count</th>
-            <th style="text-align:center;">
-              F. Est. Days Out of Stock
-              <span class="def-tip">&#9432;<span class="bubble">Estimated from eCHIS's Stockout/Low stock/Adequate status, not a measured day count. Adequate &rarr; 0, Low stock &rarr; the draft amber threshold, Stockout &rarr; the whole reporting month.</span></span>
-            </th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for row in moh748_preview %}
-          <tr>
-            <td style="font-weight:600;">
-              <span class="row-identity">
-                <span class="commodity-chip" style="background:{{ row.color }}1F;"><span class="dot" style="background:{{ row.color }};"></span></span>
-                {{ row.commodity_label }}
-              </span>
-            </td>
-            <td style="text-align:right;" class="mono{% if row.beginning_balance == None %} mono-faint{% endif %}">{{ row.beginning_balance|default_if_none:"0" }}</td>
-            <td style="text-align:right;" class="mono{% if row.quantity_received == None %} mono-faint{% endif %}">{{ row.quantity_received|default_if_none:"0" }}</td>
-            <td style="text-align:right;" class="mono{% if row.total_dispensed == None %} mono-faint{% endif %}">{{ row.total_dispensed|default_if_none:"0" }}{% if row.flagged_rows_excluded %} <span class="row-sublabel" style="display:inline;" title="{{ row.flagged_rows_excluded }} row(s) excluded &mdash; flagged by eCHIS as an implausible quantity">({{ row.flagged_rows_excluded }} excluded)</span>{% endif %}</td>
-            <td style="text-align:right;" class="mono mono-faint" title="Not present in eCHIS's export at this reporting grain">0</td>
-            <td style="text-align:right;" class="mono{% if row.physical_count == None %} mono-faint{% endif %}">{{ row.physical_count|default_if_none:"0" }}</td>
-            <td style="text-align:center;">
-              {% if row.estimated_days_out_of_stock == None %}<span class="pill GREEN">0</span>
-              {% elif row.estimated_days_out_of_stock == 0 %}<span class="pill GREEN">{{ row.estimated_days_out_of_stock }}</span>
-              {% elif row.estimated_days_out_of_stock < 7 %}<span class="pill AMBER">{{ row.estimated_days_out_of_stock }}</span>
-              {% else %}<span class="pill RED">{{ row.estimated_days_out_of_stock }}</span>{% endif %}
-            </td>
-          </tr>
-          {% endfor %}
-        </tbody>
-      </table>
-    </div>
-
-    <div class="card-sub" style="margin-top:20px; font-weight:600; color:var(--ink-soft);">Summary for Weight Band / Age Category</div>
-    <div style="overflow-x:auto; margin-top:8px;">
-      <table class="heatmap">
-        <thead>
-          <tr>
-            <th>Drug Name</th>
-            <th style="text-align:center;">5 to &lt;15kg<br>&lt;3yrs</th>
-            <th style="text-align:center;">15 to &lt;25kg<br>3-8yrs</th>
-            <th style="text-align:center;">25 to &lt;35kg<br>8-12yrs</th>
-            <th style="text-align:center;">&ge;35kg<br>&ge;12yrs</th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for row in moh748_preview %}
-          <tr>
-            <td style="font-weight:600;">
-              <span class="row-identity">
-                <span class="commodity-chip" style="background:{{ row.color }}1F;"><span class="dot" style="background:{{ row.color }};"></span></span>
-                {{ row.commodity_label }}
-              </span>
-            </td>
-            <td style="text-align:center;" class="mono mono-faint" title="Not part of the eCHIS backend data">0</td>
-            <td style="text-align:center;" class="mono mono-faint" title="Not part of the eCHIS backend data">0</td>
-            <td style="text-align:center;" class="mono mono-faint" title="Not part of the eCHIS backend data">0</td>
-            <td style="text-align:center;" class="mono mono-faint" title="Not part of the eCHIS backend data">0</td>
-          </tr>
-          {% endfor %}
-        </tbody>
-      </table>
-    </div>
-
-    <div class="card-sub" style="margin-top:20px; font-weight:600; color:var(--ink-soft);">Suspected Cases</div>
-    <div style="overflow-x:auto; margin-top:8px;">
-      <table class="heatmap">
-        <thead>
-          <tr>
-            <th></th>
-            <th style="text-align:center;">&lt;5 Yrs</th>
-            <th style="text-align:center;">&ge;5 Yrs</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr><td>No. Positive</td><td class="mono mono-faint" style="text-align:center;" title="Not part of the eCHIS backend data">0</td><td class="mono mono-faint" style="text-align:center;" title="Not part of the eCHIS backend data">0</td></tr>
-          <tr><td>No. Negative</td><td class="mono mono-faint" style="text-align:center;" title="Not part of the eCHIS backend data">0</td><td class="mono mono-faint" style="text-align:center;" title="Not part of the eCHIS backend data">0</td></tr>
-          <tr><td>No. Not Tested</td><td class="mono mono-faint" style="text-align:center;" title="Not part of the eCHIS backend data">0</td><td class="mono mono-faint" style="text-align:center;" title="Not part of the eCHIS backend data">0</td></tr>
-          <tr><td>No. Invalid</td><td class="mono mono-faint" style="text-align:center;" title="Not part of the eCHIS backend data">0</td><td class="mono mono-faint" style="text-align:center;" title="Not part of the eCHIS backend data">0</td></tr>
-          <tr><td style="font-weight:600;">Total</td><td class="mono mono-faint" style="text-align:center;" title="Not part of the eCHIS backend data">0</td><td class="mono mono-faint" style="text-align:center;" title="Not part of the eCHIS backend data">0</td></tr>
         </tbody>
       </table>
     </div>

@@ -607,19 +607,39 @@ def chp_scoped_areas(user):
     return CHPArea.objects.none()
 
 
-def apply_chp_geo_filters(queryset, *, county_id=None, sub_county_id=None, chu_id=None, area_field=None):
+def apply_chp_geo_filters(queryset, *, county_id=None, sub_county_id=None, facility_id=None, chu_id=None, area_field=None):
     prefix = "" if area_field is None else f"{area_field}__"
 
     if county_id:
         queryset = queryset.filter(**{f"{prefix}county_id": county_id})
     if sub_county_id:
         queryset = queryset.filter(**{f"{prefix}community_health_unit__sub_county_id": sub_county_id})
+    if facility_id:
+        queryset = queryset.filter(**{f"{prefix}community_health_unit__facility_id": facility_id})
     if chu_id:
         queryset = queryset.filter(**{f"{prefix}community_health_unit_id": chu_id})
     return queryset
 
 
-def chp_filter_options(user, *, county_id=None, sub_county_id=None, chu_id=None):
+def chp_filter_options(user, *, county_id=None, sub_county_id=None, facility_id=None, chu_id=None):
+    """
+    Facility sits between Sub-County and CHU, per Lynne's request, but it's
+    a much thinner filter than the other three right now: it only ever
+    lists a CHU's LINKED facility (CommunityHealthUnit.facility), and that
+    link is still blank for virtually every CHU (see the CHU-to-facility
+    mapping note on CommunityHealthUnit) -- checked against every file
+    she's shared (the eCHIS CHP Commodity Stock Flow workbook, the raw
+    commodities_order and commodity_supply/stockout exports, and the
+    original MOH 748 facility workbook) and none of them carry that link;
+    the MOH 748 workbook has County/Sub-County/Ward/Facility but no CHU
+    column at all, and every eCHIS-derived export has County/Sub-
+    County/CHU but no facility column. So this dropdown will mostly show
+    "All Facilities" until a real CHU<->facility mapping is supplied from
+    somewhere else (eCHIS's own People/Places "Link Facility" field looked
+    like the closest source, seen once in a screenshot, but was never
+    exported into any file on hand) -- the filter is wired up and ready
+    for whenever that mapping arrives.
+    """
     areas = chp_scoped_areas(user)
 
     county_ids = areas.values_list("county_id", flat=True).distinct()
@@ -633,7 +653,17 @@ def chp_filter_options(user, *, county_id=None, sub_county_id=None, chu_id=None)
     sub_county_ids = sc_qs.values_list("community_health_unit__sub_county_id", flat=True).distinct()
     sub_counties = list(SubCounty.objects.filter(id__in=sub_county_ids).order_by("name").values("id", "name"))
 
+    fac_qs = resolved.filter(community_health_unit__facility__isnull=False)
+    if sub_county_id:
+        fac_qs = fac_qs.filter(community_health_unit__sub_county_id=sub_county_id)
+    elif county_id:
+        fac_qs = fac_qs.filter(county_id=county_id)
+    facility_ids = fac_qs.values_list("community_health_unit__facility_id", flat=True).distinct()
+    facilities = list(Facility.objects.filter(id__in=facility_ids).order_by("name").values("id", "name"))
+
     chu_qs = resolved
+    if facility_id:
+        chu_qs = chu_qs.filter(community_health_unit__facility_id=facility_id)
     if sub_county_id:
         chu_qs = chu_qs.filter(community_health_unit__sub_county_id=sub_county_id)
     elif county_id:
@@ -644,13 +674,21 @@ def chp_filter_options(user, *, county_id=None, sub_county_id=None, chu_id=None)
     area_qs = areas
     if chu_id:
         area_qs = area_qs.filter(community_health_unit_id=chu_id)
+    elif facility_id:
+        area_qs = area_qs.filter(community_health_unit__facility_id=facility_id)
     elif sub_county_id:
         area_qs = area_qs.filter(community_health_unit__sub_county_id=sub_county_id)
     elif county_id:
         area_qs = area_qs.filter(county_id=county_id)
     area_list = list(area_qs.order_by("name").values("id", "name"))
 
-    return {"counties": counties, "sub_counties": sub_counties, "chus": chus, "areas": area_list}
+    return {
+        "counties": counties,
+        "sub_counties": sub_counties,
+        "facilities": facilities,
+        "chus": chus,
+        "areas": area_list,
+    }
 
 
 def weeks_of_stock_severity(weeks):
@@ -1072,8 +1110,8 @@ def build_chp_moh748_preview(records_qs, *, period_range=None):
     grain (confirmed against the Data Dictionary sheet of Lynne's own
     source workbook: "Requested columns included but blank... eCHIS has
     separate stock amendment/discrepancy events, not direct positive/
-    negative fields"). Kept as an explicit blank column, same "shown but
-    marked unavailable" treatment as the LLINs row, rather than dropped.
+    negative fields"). Kept as an explicit blank column, shown but marked
+    unavailable, rather than dropped.
 
     period_range, when given, is an (earliest, latest) "YYYY-MM" tuple —
     same Last 2 Months / Last Full Quarter rollup as
@@ -1137,22 +1175,9 @@ def build_chp_moh748_preview(records_qs, *, period_range=None):
             }
         )
 
-    # LLINs never appears in the loop above (no eCHIS equivalent at all) —
-    # add it explicitly so it's visibly "not available", not just absent.
-    rows.append(
-        {
-            "commodity_label": Commodity.LLINS.label,
-            "available": False,
-            "beginning_balance": None,
-            "quantity_received": None,
-            "total_dispensed": None,
-            "losses_excl_expiries": None,
-            "physical_count": None,
-            "estimated_days_out_of_stock": None,
-            "flagged_rows_excluded": 0,
-            "color": COMMODITY_COLOR_MAP[Commodity.LLINS],
-        }
-    )
+    # LLINs is intentionally left out entirely (not shown even as an
+    # "unavailable" row) — Lynne asked for it removed from the Generated
+    # MOH 748 since eCHIS has no equivalent for it at all here.
     return rows
 
 
@@ -1551,12 +1576,15 @@ def _chp_resolve_scope(request):
 
     county_id = request.GET.get("county") or None
     sub_county_id = request.GET.get("sub_county") or None
+    facility_id = request.GET.get("facility") or None
     chu_id = request.GET.get("chu") or None
     area_id = request.GET.get("area") or None
     search_query = (request.GET.get("q") or "").strip()
     view_param = request.GET.get("view") or None
 
-    filtered_areas = apply_chp_geo_filters(areas, county_id=county_id, sub_county_id=sub_county_id, chu_id=chu_id)
+    filtered_areas = apply_chp_geo_filters(
+        areas, county_id=county_id, sub_county_id=sub_county_id, facility_id=facility_id, chu_id=chu_id
+    )
     if area_id:
         filtered_areas = filtered_areas.filter(id=area_id)
     if search_query:
@@ -1589,6 +1617,7 @@ def _chp_resolve_scope(request):
         "period_display_label": period_display_label,
         "county_id": county_id,
         "sub_county_id": sub_county_id,
+        "facility_id": facility_id,
         "chu_id": chu_id,
         "area_id": area_id,
         "search_query": search_query,
@@ -1608,6 +1637,7 @@ def chp_commodity_home(request):
     period_range = scope["period_range"]
     county_id = scope["county_id"]
     sub_county_id = scope["sub_county_id"]
+    facility_id = scope["facility_id"]
     chu_id = scope["chu_id"]
     area_id = scope["area_id"]
     search_query = scope["search_query"]
@@ -1663,10 +1693,13 @@ def chp_commodity_home(request):
         "period_presets": chp_period_presets(),
         "selected_range": range_key or "",
         "selected_single_preset": scope["selected_single_preset"] or "",
-        "filters": chp_filter_options(user, county_id=county_id, sub_county_id=sub_county_id, chu_id=chu_id),
+        "filters": chp_filter_options(
+            user, county_id=county_id, sub_county_id=sub_county_id, facility_id=facility_id, chu_id=chu_id
+        ),
         "selected": {
             "county": county_id or "",
             "sub_county": sub_county_id or "",
+            "facility": facility_id or "",
             "chu": chu_id or "",
             "area": area_id or "",
             "q": search_query,
@@ -1705,10 +1738,6 @@ def chp_commodity_home(request):
     # status" view Lynne asked for alongside the heatmap.
     context["balance_summary"] = build_chp_balance_summary(records, period_range=period_range)
 
-    # Preview only — never written to MOH748Record. See
-    # build_chp_moh748_preview()'s docstring.
-    context["moh748_preview"] = build_chp_moh748_preview(records, period_range=period_range)
-
     return render(request, "core/chp_home.html", context)
 
 
@@ -1732,6 +1761,7 @@ def chp_moh748_page(request):
     user = scope["user"]
     county_id = scope["county_id"]
     sub_county_id = scope["sub_county_id"]
+    facility_id = scope["facility_id"]
     chu_id = scope["chu_id"]
     area_id = scope["area_id"]
 
@@ -1755,10 +1785,13 @@ def chp_moh748_page(request):
         "period_presets": chp_period_presets(),
         "selected_range": scope["range_key"] or "",
         "selected_single_preset": scope["selected_single_preset"] or "",
-        "filters": chp_filter_options(user, county_id=county_id, sub_county_id=sub_county_id, chu_id=chu_id),
+        "filters": chp_filter_options(
+            user, county_id=county_id, sub_county_id=sub_county_id, facility_id=facility_id, chu_id=chu_id
+        ),
         "selected": {
             "county": county_id or "",
             "sub_county": sub_county_id or "",
+            "facility": facility_id or "",
             "chu": chu_id or "",
             "area": area_id or "",
             "q": scope["search_query"],
@@ -1795,6 +1828,7 @@ def chp_s11_page(request):
     user = scope["user"]
     county_id = scope["county_id"]
     sub_county_id = scope["sub_county_id"]
+    facility_id = scope["facility_id"]
     chu_id = scope["chu_id"]
     area_id = scope["area_id"]
 
@@ -1829,10 +1863,13 @@ def chp_s11_page(request):
         "period_presets": chp_period_presets(),
         "selected_range": scope["range_key"] or "",
         "selected_single_preset": scope["selected_single_preset"] or "",
-        "filters": chp_filter_options(user, county_id=county_id, sub_county_id=sub_county_id, chu_id=chu_id),
+        "filters": chp_filter_options(
+            user, county_id=county_id, sub_county_id=sub_county_id, facility_id=facility_id, chu_id=chu_id
+        ),
         "selected": {
             "county": county_id or "",
             "sub_county": sub_county_id or "",
+            "facility": facility_id or "",
             "chu": chu_id or "",
             "area": area_id or "",
             "q": scope["search_query"],
