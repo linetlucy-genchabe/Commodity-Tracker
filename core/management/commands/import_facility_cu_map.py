@@ -1,21 +1,36 @@
 """
 One-off/re-runnable import: link CommunityHealthUnit -> Facility from a KHIS
-"Health Facilities & CUs" export.
+"Health Facilities & CUs" export, creating the Facility (and its Ward, if
+needed) directly from this file when it doesn't exist yet.
 
 Lynne asked (repeatedly) whether any of her files carried a CHU-to-facility
 mapping. None of the eCHIS exports do (they have CHU but no facility), and
-the MOH 748 workbook has facility but no CHU. This KHIS export is the first
-file that actually pairs the two: each row where the "CU" column is filled
-in is a Community Health Unit, linked to the "Health Facility" it reports
-through, alongside County/Subcounty/Ward.
+the original MOH 748 workbook has facility but no CHU. This KHIS export is
+the first file that actually pairs the two: each row where the "CU" column
+is filled in is a Community Health Unit, linked to the "Health Facility" it
+reports through, alongside County/Subcounty/Ward.
 
-Checked against her real data before writing this: for Kisumu, 270 of 291
-distinct eCHIS CHU names match this file's CU names exactly (case/whitespace
-aside), and all 155 distinct facility names in the matched CU rows already
-exist as Facility rows (seeded from the MOH 748 workbook) -- so this command
-only ever LINKS existing CommunityHealthUnit and Facility rows to each
-other; it never creates new ones. A CHU or facility name that can't be
-matched is reported and skipped, never guessed at.
+Facility used to only ever get created by uploading that original MOH 748
+workbook (see parse_moh748_workbook) -- but Lynne has confirmed that
+workbook won't be used anywhere in this system going forward; all data is
+meant to come from eCHIS-derived files. Production never had an MOH 748
+workbook uploaded, so its Facility table came up empty, and this command's
+first real run there failed to match all 272 distinct facility names for
+exactly that reason. So this command now creates a Facility itself,
+straight from this file's own County/Subcounty/Ward/Health Facility columns,
+whenever a CU's linked facility doesn't already exist -- no MOH 748 upload
+required, ever. The new facility is filed under its matched CommunityHealthUnit's
+own Sub-County (the authoritative one, already established by the eCHIS CHP
+Commodity Stock Flow upload) rather than re-deriving/creating a Sub-County
+from this file, so it can never fragment the Sub-County list used elsewhere
+in the app; only its Ward is looked up or created here, scoped to that same
+Sub-County.
+
+This command still never creates a CommunityHealthUnit. A CU name in this
+file with no matching CommunityHealthUnit already in the app is a genuine
+naming inconsistency to fix at the source (a retired/duplicate CU entry, or
+similar) -- not something to paper over by inventing a new CHU record. Lynne
+looked at that "not found" list and chose to leave those alone.
 
 Written generically (matches whichever County/Subcounty/CU/Facility names
 are in the file) so the same command can be re-run later for Busia,
@@ -32,7 +47,8 @@ import re
 import pandas as pd
 from django.core.management.base import BaseCommand, CommandError
 
-from core.models import CommunityHealthUnit, Facility
+from core.models import CommunityHealthUnit, Facility, Ward
+from core.parsing import _strip_admin_suffix
 
 
 def _normalize(value):
@@ -51,8 +67,9 @@ class Command(BaseCommand):
     help = (
         "Link CommunityHealthUnit.facility from a KHIS Health Facilities & "
         "CUs export (columns: Country, County, Subcounty, Ward, Health "
-        "Facility, CU). Only links existing CHU/Facility rows -- never "
-        "creates new ones."
+        "Facility, CU). Creates the Facility (and its Ward, if needed) from "
+        "this file when it doesn't already exist -- never creates a "
+        "CommunityHealthUnit."
     )
 
     def add_arguments(self, parser):
@@ -118,7 +135,10 @@ class Command(BaseCommand):
 
         # --- Pass 2: index existing CHUs and Facilities by a normalized name
         # key, scoped by county name (also normalized) so the same command
-        # works for any county's export without hardcoding "Kisumu". ---
+        # works for any county's export without hardcoding "Kisumu". Wards
+        # are indexed scoped by their Sub-County id instead, since a new
+        # Facility is always filed under its CHU's own (already-correct)
+        # Sub-County -- see the module docstring. ---
         chus_by_key = {}
         for chu in CommunityHealthUnit.objects.select_related("sub_county__county"):
             key = (_normalize(chu.sub_county.county.name), _normalize(chu.name))
@@ -129,11 +149,16 @@ class Command(BaseCommand):
             key = (_normalize(facility.ward.sub_county.county.name), _normalize(facility.name))
             facilities_by_key.setdefault(key, []).append(facility)
 
+        wards_by_key = {}
+        for ward in Ward.objects.all():
+            wards_by_key[(ward.sub_county_id, _normalize(ward.name))] = ward
+
         linked = 0
         already_linked_same = 0
         relinked_changed = 0
+        facilities_created = 0
+        wards_created = 0
         chu_not_found = []
-        facility_not_found = []
         ambiguous = []
         conflicting = []
         seen_cu_keys = set()
@@ -141,7 +166,8 @@ class Command(BaseCommand):
         for _, row in cu_rows.iterrows():
             county_name = row.get("County")
             cu_name = row.get("CU")
-            facility_name = row.get("Health Facility")
+            facility_name = str(row.get("Health Facility")).strip()
+            ward_name = _strip_admin_suffix(row.get("Ward"))
 
             county_key = county_key_of(county_name)
             cu_key = (county_key, _normalize(cu_name))
@@ -161,22 +187,56 @@ class Command(BaseCommand):
             seen_cu_keys.add(cu_key)
 
             chu_matches = chus_by_key.get(cu_key, [])
-            facility_matches = facilities_by_key.get(facility_key, [])
-
             if not chu_matches:
                 chu_not_found.append(str(cu_name).strip())
                 continue
-            if not facility_matches:
-                facility_not_found.append(str(facility_name).strip())
+            if len(chu_matches) > 1:
+                ambiguous.append(f"{cu_name} -> {facility_name} ({len(chu_matches)} CHU match(es))")
                 continue
-            if len(chu_matches) > 1 or len(facility_matches) > 1:
-                ambiguous.append(f"{cu_name} -> {facility_name} ({len(chu_matches)} CHU match(es), {len(facility_matches)} facility match(es))")
-                continue
-
             chu = chu_matches[0]
-            facility = facility_matches[0]
 
-            if chu.facility_id == facility.id:
+            facility_matches = facilities_by_key.get(facility_key, [])
+            if len(facility_matches) > 1:
+                ambiguous.append(f"{cu_name} -> {facility_name} ({len(facility_matches)} facility match(es))")
+                continue
+
+            if facility_matches:
+                facility = facility_matches[0]
+            else:
+                # No existing Facility with this name in this county -- file
+                # it under the CHU's own (already-correct) Sub-County,
+                # finding or creating that Sub-County's Ward from this row.
+                sub_county = chu.sub_county
+                ward_key = (sub_county.id, _normalize(ward_name))
+                ward = wards_by_key.get(ward_key)
+                if ward is None:
+                    if not dry_run:
+                        ward, ward_was_created = Ward.objects.get_or_create(
+                            sub_county=sub_county, name=ward_name or "Unspecified"
+                        )
+                    else:
+                        ward_was_created = True  # would be created
+                        ward = Ward(sub_county=sub_county, name=ward_name or "Unspecified")
+                    wards_by_key[ward_key] = ward
+                    if ward_was_created:
+                        wards_created += 1
+
+                if not dry_run:
+                    facility, facility_was_created = Facility.objects.get_or_create(
+                        ward=ward, name=facility_name
+                    )
+                else:
+                    facility_was_created = True  # would be created
+                    facility = Facility(ward=ward, name=facility_name)
+                facilities_by_key.setdefault(facility_key, []).append(facility)
+                if facility_was_created:
+                    facilities_created += 1
+
+            # facility.pk is None only for a --dry-run "would create" facility
+            # that doesn't exist in the database yet -- a CHU can never
+            # already be linked to a facility that doesn't exist, so that
+            # case always falls through to "would link" below, correctly.
+            if facility.pk is not None and chu.facility_id == facility.pk:
                 already_linked_same += 1
                 continue
 
@@ -194,17 +254,15 @@ class Command(BaseCommand):
             f"({relinked_changed} of those replaced a different existing link)."
         ))
         self.stdout.write(f"Already linked to the same facility (no change needed): {already_linked_same}")
+        self.stdout.write(
+            f"{'Would create' if dry_run else 'Created'} {facilities_created} new Facility record(s) "
+            f"({wards_created} new Ward record(s) along with them)."
+        )
         if chu_not_found:
             self.stdout.write(self.style.WARNING(
                 f"CU names in the file with no matching CommunityHealthUnit in the app ({len(chu_not_found)}):"
             ))
             for name in sorted(set(chu_not_found)):
-                self.stdout.write(f"  - {name}")
-        if facility_not_found:
-            self.stdout.write(self.style.WARNING(
-                f"Health Facility names in the file with no matching Facility in the app ({len(facility_not_found)}):"
-            ))
-            for name in sorted(set(facility_not_found)):
                 self.stdout.write(f"  - {name}")
         if ambiguous:
             self.stdout.write(self.style.WARNING(f"Ambiguous (skipped, {len(ambiguous)}):"))
