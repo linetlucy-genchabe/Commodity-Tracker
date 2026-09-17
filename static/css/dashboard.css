@@ -135,7 +135,7 @@ a:hover{color:var(--navy); text-decoration:underline;}
   min-height:calc(100vh - 64px); max-height:100vh; overflow-y:auto;
 }
 .filter-sidebar select.filter-active{
-  border:1.5px solid #fff; box-shadow:0 0 0 3px rgba(255,255,255,.22);
+  border:1.5px solid #fff; box-shadow:0 0 0 3px rgba(255,255,255,.22); background:var(--sky);
 }
 .filter-sidebar .filter-group select,
 .filter-sidebar .filter-group input{width:100%; min-width:0; max-width:100%;}
@@ -150,16 +150,22 @@ a:hover{color:var(--navy); text-decoration:underline;}
 .filter-sidebar .filter-group label{color:rgba(255,255,255,.55);}
 .filter-sidebar .filter-group select,
 .filter-sidebar .facility-search{
-  border:1px solid rgba(255,255,255,.22); background:rgba(255,255,255,.08); color:#fff;
+  /* Solid navy2 (the same blue as the navbar's active tab), not a faint
+     white tint on navy — Lynne flagged the closed dropdowns as reading as
+     plain white/inconsistent rather than clearly matching the header. */
+  border:1px solid rgba(255,255,255,.35); background:var(--navy2); color:#fff;
 }
-/* The <select> itself is white-on-translucent-navy (readable, by design),
-   but its dropdown popup is rendered by the browser as an opaque list that
-   ignores the select's own background — so the white text above was
-   showing up on a white popup with no override. Force the popup's own
-   text/background explicitly so the open list stays readable; this does
-   not affect how the closed select looks. */
+/* The dropdown POPUP (the open list of options) is rendered by the browser
+   itself, outside the page's normal layout, and most browsers ignore a
+   <select>'s own background for it — left unstyled it renders as an opaque
+   white list, which is what looked inconsistent with the navy sidebar
+   around it. Force the popup's own background/text to the same navy2/white
+   as the closed select so the whole control reads as one uniform blue
+   control, open or closed. (Some older/locked-down browsers still can't be
+   fully restyled here and will fall back to their own OS list styling for
+   the popup specifically — the closed select itself is unaffected.) */
 .filter-sidebar .filter-group select option{
-  color:var(--ink); background:#fff;
+  color:#fff; background:var(--navy2);
 }
 .filter-sidebar .sidebar-heading{color:rgba(255,255,255,.62);}
 .filter-sidebar .sidebar-actions{border-top:1px solid rgba(255,255,255,.16); padding-top:14px; margin-top:2px;}
