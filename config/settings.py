@@ -78,7 +78,7 @@ WSGI_APPLICATION = "config.wsgi.application"
 # automatically — nothing else to configure. Locally, with no DATABASE_URL
 # set, this falls back to the DB_* variables in .env.
 _local_db_url = (
-    f"postgres://{os.environ.get('DB_USER', 'lynne')}:{os.environ.get('DB_PASSWORD', 'lynne')}"
+    f"postgres://{os.environ.get('DB_USER', 'cgd')}:{os.environ.get('DB_PASSWORD', 'cgd_dev_pw')}"
     f"@{os.environ.get('DB_HOST', '127.0.0.1')}:{os.environ.get('DB_PORT', '5432')}"
     f"/{os.environ.get('DB_NAME', 'commodity_tracker')}"
 )
@@ -112,7 +112,7 @@ STORAGES = {
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 LOGIN_URL = "login"
-LOGIN_REDIRECT_URL = "home"
+LOGIN_REDIRECT_URL = "chp_home"
 LOGOUT_REDIRECT_URL = "login"
 
 # Railway terminates TLS at its edge and talks plain HTTP to the app, so

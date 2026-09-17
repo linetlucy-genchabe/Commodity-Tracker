@@ -2112,7 +2112,7 @@ def delete_moh748_upload(request, upload_id):
 
 
 @login_required
-@user_passes_test(_can_upload, login_url="home")
+@user_passes_test(_can_upload, login_url="chp_home")
 def upload_chp_commodity(request):
     result = None
     form = CHPCommodityUploadForm()
@@ -2146,7 +2146,7 @@ def upload_chp_commodity(request):
 
 
 @login_required
-@user_passes_test(_can_upload, login_url="home")
+@user_passes_test(_can_upload, login_url="chp_home")
 def delete_chp_commodity_upload(request, upload_id):
     upload = get_object_or_404(CHPCommodityUpload, pk=upload_id)
     if request.method == "POST":
