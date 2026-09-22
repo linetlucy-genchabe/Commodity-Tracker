@@ -714,6 +714,20 @@ def weeks_of_stock_severity(weeks):
     return "RED_LIGHT"
 
 
+CHP_REORDER_TARGET_WEEKS = 6
+"""
+The weeks-of-stock level Projected Reorder Qty aims to top a CHP back up
+to -- the top of the "adequate" band in weeks_of_stock_severity() (4-6
+weeks), i.e. filling right up to the edge of "overstocked" rather than
+only to the middle of "adequate". Lynne can ask for a different target;
+this is the one number to change if so.
+"""
+
+CHP_AVG_WEEKS_PER_MONTH = 4.345
+"""365.25 / 12 / 7 -- weeks per calendar month on average, used to turn a
+period's total Quantity Dispensed into an average weekly rate."""
+
+
 def chp_weeks_bands(records_qs):
     """
     One weeks-of-stock band per CHP -- its own average across whatever
@@ -941,10 +955,11 @@ def build_chp_geo_summary(records_qs, areas_qs, *, group_by):
 def build_chp_balance_summary(records_qs, *, period_range=None):
     """
     Per-commodity stock-flow totals (beginning balance, received, dispensed,
-    ending balance, physical count, stock on hand, avg. weeks of stock)
-    across whatever CHP-area scope is currently in view — same role as MOH
-    748's build_balance_summary(), and shown the same way: visible at every
-    drill-down level, narrowing as the geography filter narrows.
+    ending balance, physical count, stock on hand, avg. weeks of stock,
+    projected reorder qty) across whatever CHP-area scope is currently in
+    view — same role as MOH 748's build_balance_summary(), and shown the
+    same way: visible at every drill-down level, narrowing as the
+    geography filter narrows.
 
     A commodity with no records at all in scope gets None for every field
     (rendered as "not reported"); a commodity that genuinely summed to zero
@@ -969,6 +984,13 @@ def build_chp_balance_summary(records_qs, *, period_range=None):
     Physical Count / Stock on Hand (the "current state" figures) come from
     its last month only — summing those across months would double-count
     stock that was never actually received twice.
+
+    Projected Reorder Qty answers "how much should we order to get this
+    scope back to a healthy stock level, given how fast it's actually
+    moving": (target weeks of stock x avg weekly dispensed rate) minus
+    Stock on Hand, floored at 0. See CHP_REORDER_TARGET_WEEKS for the
+    target and CHP_AVG_WEEKS_PER_MONTH for the weeks-per-month constant
+    used to turn a period's Dispensed total into a weekly rate.
     """
     rows = []
     for commodity in CHPCommodity:
@@ -1001,6 +1023,28 @@ def build_chp_balance_summary(records_qs, *, period_range=None):
 
         avg_weeks = flow_agg["avg_weeks_of_stock"]
         avg_weeks_rounded = round(float(avg_weeks), 1) if avg_weeks is not None else None
+
+        # Projected Reorder Qty -- how much of this commodity to order to
+        # bring this scope back up to CHP_REORDER_TARGET_WEEKS of stock,
+        # given how fast it's actually been moving: target stock level
+        # (avg weekly dispensed rate x target weeks) minus what's on the
+        # shelf right now (Stock on Hand), floored at 0 (never a negative
+        # "reorder"). None (not "0") when there's no Dispensed data at all
+        # for this commodity in scope -- same "no data" vs. "genuinely
+        # zero" distinction used everywhere else on this table; a
+        # commodity with real data that just isn't moving (0 dispensed)
+        # correctly projects to 0, not "no data".
+        dispensed_total = dispensed_agg["quantity_dispensed"]
+        if dispensed_total is None:
+            projected_reorder_qty = None
+        else:
+            periods_in_scope = commodity_qs.values_list("period", flat=True).distinct().count() or 1
+            weeks_in_scope = periods_in_scope * CHP_AVG_WEEKS_PER_MONTH
+            avg_weekly_dispensed = float(dispensed_total) / weeks_in_scope
+            target_stock_level = CHP_REORDER_TARGET_WEEKS * avg_weekly_dispensed
+            current_stock = float(state_agg["stock_on_hand"] or 0)
+            projected_reorder_qty = max(0, round(target_stock_level - current_stock))
+
         rows.append(
             {
                 "commodity": commodity,
@@ -1013,6 +1057,7 @@ def build_chp_balance_summary(records_qs, *, period_range=None):
                 "avg_weeks_of_stock": avg_weeks_rounded,
                 "weeks_status": weeks_of_stock_severity(avg_weeks_rounded),
                 "weeks_overstocked": avg_weeks_rounded is not None and avg_weeks_rounded > 6,
+                "projected_reorder_qty": projected_reorder_qty,
                 "flagged_rows_excluded": flagged_count,
                 "color": CHP_COMMODITY_COLOR_MAP[commodity],
             }
@@ -1737,6 +1782,7 @@ def chp_commodity_home(request):
     # drill-down level. This is the "actual balances, not just stockout
     # status" view Lynne asked for alongside the heatmap.
     context["balance_summary"] = build_chp_balance_summary(records, period_range=period_range)
+    context["reorder_target_weeks"] = CHP_REORDER_TARGET_WEEKS
 
     return render(request, "core/chp_home.html", context)
 
@@ -1910,6 +1956,7 @@ def export_chp_balances_csv(request):
         "Dispensed",
         "Ending Balance",
         "Avg Weeks of Stock",
+        f"Projected Reorder Qty (to {CHP_REORDER_TARGET_WEEKS}wk)",
         "Flagged Rows Excluded (Dispensed)",
     ]
     data = [
@@ -1921,6 +1968,7 @@ def export_chp_balances_csv(request):
             row["quantity_dispensed"],
             row["ending_balance"],
             row["avg_weeks_of_stock"],
+            row["projected_reorder_qty"],
             row["flagged_rows_excluded"],
         ]
         for row in rows

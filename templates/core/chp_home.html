@@ -176,6 +176,10 @@
               Avg. Weeks of Stock
               <span class="def-tip">&#9432;<span class="bubble">Red under 2 weeks (stockout/low stock) or over 6 weeks (overstocked) &middot; amber 2&ndash;4 weeks (low/moderate) &middot; green 4&ndash;6 weeks (adequate).</span></span>
             </th>
+            <th style="text-align:right;">
+              Projected Reorder Qty
+              <span class="def-tip">&#9432;<span class="bubble">How much to order to bring this scope back up to {{ reorder_target_weeks }} weeks of stock, based on how fast it's actually been dispensed: (avg weekly dispensed &times; {{ reorder_target_weeks }} weeks) minus Stock on Hand, never below 0.</span></span>
+            </th>
           </tr>
         </thead>
         <tbody>
@@ -196,6 +200,7 @@
               {% if row.avg_weeks_of_stock == None %}<span class="mono mono-faint">0</span>
               {% else %}<span class="pill {{ row.weeks_status }}">{{ row.avg_weeks_of_stock }}{% if row.weeks_overstocked %} (overstocked){% endif %}</span>{% endif %}
             </td>
+            <td style="text-align:right;" class="mono{% if row.projected_reorder_qty == None %} mono-faint{% endif %}">{{ row.projected_reorder_qty|default_if_none:"0" }}</td>
           </tr>
           {% endfor %}
         </tbody>
